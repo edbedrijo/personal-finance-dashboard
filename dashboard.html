@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Personal Finance</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { background: #14171c; color: #fff; font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif; -webkit-font-smoothing: antialiased; }
+  .editable { cursor: pointer; border-radius: 4px; transition: background 0.15s; }
+  .editable:hover { background: rgba(255,255,255,0.06); }
+  .editable-input { background: rgba(99,102,241,0.15); border: 1px solid #6366f1; border-radius: 4px; padding: 2px 6px; color: #fff; font: inherit; outline: none; min-width: 80px; }
+  .tab-btn { transition: all 0.15s ease; cursor: pointer; }
+  .tab-btn.active { background: #fff !important; color: #14171c !important; font-weight: 600; }
+  .section-label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; color: #4b5563; }
+  ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: #14171c; } ::-webkit-scrollbar-thumb { background: #2d3139; border-radius: 3px; }
+</style>
+</head>
+<body>
+<div id="app" class="max-w-3xl mx-auto px-5 py-8"></div>
+<script>
+const STORAGE_KEY = 'pf_v2';
+const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const now = new Date();
+const currentMonthLabel = MONTHS[now.getMonth()] + ' ' + now.getFullYear();
+
+const defaultState = {
+  accounts: [
+    { id:'unionbank',    name:'Unionbank',     balance:33169.02 },
+    { id:'securitybank', name:'Security Bank', balance:35693.34 },
+    { id:'maribank',     name:'Maribank',      balance:2617.00  },
+    { id:'gcash',        name:'GCash',         balance:1478.03  },
+    { id:'maya',         name:'Maya',          balance:547.56   },
+    { id:'cash',         name:'Cash on hand',  balance:1000.00  },
+  ],
+  creditCards: [
+    { id:'unionbankCC', name:'Unionbank CC',     outstanding:53206.58, limit:470000, dueDay:25 },
+    { id:'securityCC',  name:'Security Bank CC', outstanding:17.00,    limit:50000,  dueDay:25 },
+  ],
+  monthly: {
+    label: currentMonthLabel,
+    income: 171941.58,
+    expenses: 116508.54,
+    avgMonthlyExpenses: 150000,
+    categories: [
+      { id:'c1', name:'Travel',         icon:'✈️',  amount:33669, color:'#6366f1' },
+      { id:'c2', name:'Food',           icon:'🍚',  amount:22648, color:'#f59e0b' },
+      { id:'c3', name:'Housing',        icon:'🏠',  amount:22000, color:'#10b981' },
+      { id:'c4', name:'Transportation', icon:'🚗',  amount:8137,  color:'#3b82f6' },
+      { id:'c5', name:'Family Support', icon:'👨‍👩‍👧', amount:8100,  color:'#ec4899' },
+    ]
+  },
+  recurring: [
+    { id:'r1', name:'Rent',                 amount:22000, dueDay:1,  type:'expense', icon:'🏠', variable:false },
+    { id:'r2', name:'Starlink',             amount:2500,  dueDay:5,  type:'expense', icon:'🌐', variable:false },
+    { id:'r3', name:'Parents support',      amount:5000,  dueDay:10, type:'expense', icon:'👨‍👩‍👧', variable:false },
+    { id:'r4', name:'Ate Annie salary',     amount:6000,  dueDay:15, type:'expense', icon:'👵', variable:false },
+    { id:'r5', name:'Unionbank CC bill',    amount:13692, dueDay:25, type:'expense', icon:'💳', variable:true  },
+    { id:'r6', name:'Upwork payout',        amount:0,     dueDay:7,  type:'income',  icon:'💼', variable:true  },
+    { id:'r7', name:'Brickell Ads revenue', amount:0,     dueDay:1,  type:'income',  icon:'📈', variable:true  },
+  ],
+  goals: [
+    { id:'g1', name:'Car downpayment', icon:'🚗', target:500000, saved:50000, targetDate:'2026-12-31', status:'In progress' }
+  ],
+  forecastDays: 7,
+};
+
+let state = (() => { try { const s = localStorage.getItem(STORAGE_KEY); if(s) return JSON.parse(s); } catch(e){} return JSON.parse(JSON.stringify(defaultState)); })();
+const save = () => { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch(e){} };
+
+const fmt  = n => '₱' + Math.round(n).toLocaleString('en-PH');
+const fmt2 = n => '₱' + n.toLocaleString('en-PH', {minimumFractionDigits:2, maximumFractionDigits:2});
+const sfx  = d => d>3&&d<21?'th':{1:'st',2:'nd',3:'rd'}[d%10]||'th';
+const totalAssets = () => state.accounts.reduce((s,a)=>s+a.balance,0);
+const totalLiab   = () => state.creditCards.reduce((s,c)=>s+c.outstanding,0);
+const netWorth    = () => totalAssets()-totalLiab();
+
+function daysUntil(dueDay) {
+  const d = now.getDate();
+  if (dueDay >= d) return dueDay - d;
+  const next = new Date(now.getFullYear(), now.getMonth()+1, dueDay);
+  return Math.ceil((next - now)/(1000*60*60*24));
+}
+
+function monthsBetween(ds) {
+  const t = new Date(ds);
+  return Math.max((t.getFullYear()-now.getFullYear())*12+(t.getMonth()-now.getMonth()),0);
+}
+
+function editable(value, path, formatter) {
+  const disp = (value===0) ? '—' : (formatter?formatter(value):value);
+  return `<span class="editable px-1" data-path="${path}" data-val="${value}">${disp}</span>`;
+}
+
+function attachEdits() {
+  document.querySelectorAll('[data-path]').forEach(el => {
+    el.addEventListener('click', e => {
+      e.stopPropagation();
+      const path = el.dataset.path;
+      const inp = document.createElement('input');
+      inp.type='number'; inp.step='0.01'; inp.value=parseFloat(el.dataset.val); inp.className='editable-input';
+      el.replaceWith(inp); inp.focus(); inp.select();
+      const commit = () => { const v=parseFloat(inp.value); if(!isNaN(v)) setPath(path,v); render(); };
+      inp.addEventListener('blur', commit);
+      inp.addEventListener('keydown', ev => { if(ev.key==='Enter') commit(); if(ev.key==='Escape') render(); });
+    });
+  });
+}
+
+function setPath(path, val) {
+  const [col,...rest] = path.split('.');
+  if (col==='accounts') {
+    const [id,field]=rest; const item=state.accounts.find(x=>x.id===id); if(item) item[field]=val;
+  } else if (col==='creditCards') {
+    const [id,field]=rest; const item=state.creditCards.find(x=>x.id===id); if(item) item[field]=val;
+  } else if (col==='monthly') {
+    const [field,id,prop]=rest;
+    if (field==='categories') { const item=state.monthly.categories.find(x=>x.id===id); if(item) item[prop]=val; }
+    else state.monthly[field]=val;
+  } else if (col==='goals') {
+    const [id,field]=rest; const item=state.goals.find(x=>x.id===id); if(item) item[field]=val;
+  }
+  save(); 
+}
+
+window.setForecast = d => { state.forecastDays=d; save(); render(); };
+
+function render() {
+  const nw = netWorth();
+  const assets = totalAssets();
+  const liab = totalLiab();
+  const m = state.monthly;
+  const net = m.income - m.expenses;
+  const incomeW = Math.min((m.income / Math.max(m.income, m.expenses))*100,100);
+  const expW = Math.min((m.expenses / Math.max(m.income, m.expenses))*100,100);
+  const dailyBurn = m.avgMonthlyExpenses / 30;
+  const runway = Math.floor(assets / dailyBurn);
+  const savingsRate = m.income > 0 ? ((net/m.income)*100).toFixed(1) : 0;
+  const maxCat = Math.max(...m.categories.map(c=>c.amount),1);
+  const forecastItems = {
+    income:  state.recurring.filter(r=>r.type==='income'  && daysUntil(r.dueDay)<=state.forecastDays),
+    expense: state.recurring.filter(r=>r.type==='expense' && daysUntil(r.dueDay)<=state.forecastDays),
+  };
+  const forecastIncome  = forecastItems.income.reduce((s,r)=>s+r.amount,0);
+  const forecastExpense = forecastItems.expense.reduce((s,r)=>s+r.amount,0);
+  const available = assets + forecastIncome - forecastExpense;
+
+  document.getElementById('app').innerHTML = `
+    <div class="flex items-center gap-2 text-2xl font-bold mb-1">💰 Personal Finance</div>
+    <nav class="flex gap-5 text-sm text-gray-500 border-b border-gray-800 pb-3 mb-7 flex-wrap">
+      <span class="flex items-center gap-1 hover:text-gray-300 cursor-pointer">💸 Transactions</span>
+      <span class="flex items-center gap-1 hover:text-gray-300 cursor-pointer">🏦 Accounts</span>
+      <span class="flex items-center gap-1 hover:text-gray-300 cursor-pointer">🎯 Goals</span>
+      <span class="flex items-center gap-1 hover:text-gray-300 cursor-pointer">📁 Categories</span>
+      <span class="flex items-center gap-1 hover:text-gray-300 cursor-pointer">🔁 Recurring</span>
+    </nav>
+
+    <!-- NET WORTH -->
+    <div class="rounded-2xl p-6 mb-6" style="background:linear-gradient(135deg,#4338ca 0%,#6366f1 100%)">
+      <div class="text-sm opacity-75 mb-1">Net worth</div>
+      <div class="text-5xl font-bold tracking-tight mb-5">${fmt2(nw)}</div>
+      <div class="flex gap-10">
+        <div><div class="text-xs opacity-60 mb-0.5">Assets</div><div class="text-lg font-semibold">${fmt2(assets)}</div></div>
+        <div><div class="text-xs opacity-60 mb-0.5">Liabilities</div><div class="text-lg font-semibold">${fmt2(liab)}</div></div>
+      </div>
+    </div>
+
+    <!-- ACCOUNTS -->
+    <div class="flex items-center justify-between mb-3">
+      <div class="section-label">DEBIT ACCOUNTS</div>
+      <div class="text-xs text-emerald-400 font-medium">${fmt2(assets)}</div>
+    </div>
+    <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-3">
+      ${state.accounts.map(a=>`
+        <div class="bg-[#1d2027] rounded-xl p-4">
+          <div class="text-xs text-gray-400 mb-2">${a.name}</div>
+          <div class="text-lg font-semibold">${editable(a.balance,`accounts.${a.id}.balance`,fmt)}</div>
+        </div>`).join('')}
+    </div>
+
+    <!-- CREDIT CARDS -->
+    <div class="flex items-center justify-between mb-3 mt-6">
+      <div class="section-label">CREDIT CARDS</div>
+      <div class="text-xs text-red-400 font-medium">OWED ${fmt2(liab)}</div>
+    </div>
+    <div class="space-y-3 mb-7">
+      ${state.creditCards.map(c=>{
+        const avail = c.limit - c.outstanding;
+        const pct = c.limit>0 ? Math.min((c.outstanding/c.limit)*100,100) : 0;
+        return `<div class="bg-[#1d2027] rounded-xl p-4">
+          <div class="flex justify-between items-start mb-3">
+            <div>
+              <div class="font-medium">${c.name}</div>
+              <div class="text-xs text-gray-500 mt-0.5">Due ${c.dueDay}${sfx(c.dueDay)} of month · ${daysUntil(c.dueDay)} days away</div>
+            </div>
+            <div class="text-right">
+              <div class="text-red-400 font-semibold">${editable(c.outstanding,`creditCards.${c.id}.outstanding`,fmt2)}</div>
+              <div class="text-xs text-gray-500">avl. ${fmt2(avail)}</div>
+            </div>
+          </div>
+          <div class="bg-[#0f1116] rounded-full overflow-hidden" style="height:3px">
+            <div style="width:${pct}%;height:3px;background:#ef4444;border-radius:2px"></div>
+          </div>
+        </div>`;}).join('')}
+    </div>
+
+    <!-- THIS MONTH P&L -->
+    <div class="bg-[#1d2027] rounded-2xl p-5 mb-4">
+      <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center gap-2">
+          <span>📊</span>
+          <span class="font-semibold">${m.label}</span>
+        </div>
+        <div class="text-xs px-2.5 py-1 rounded-full font-semibold ${net>=0?'bg-emerald-900/40 text-emerald-400':'bg-red-900/40 text-red-400'}">${net>=0?'+':''}${fmt(net)}</div>
+      </div>
+      <div class="space-y-3">
+        <div>
+          <div class="flex justify-between text-sm mb-1.5">
+            <span class="text-gray-400">Income</span>
+            <span class="text-emerald-400 font-medium">${editable(m.income,'monthly.income',fmt2)}</span>
+          </div>
+          <div class="bg-[#0f1116] rounded-full overflow-hidden" style="height:6px">
+            <div style="width:${incomeW}%;height:6px;background:linear-gradient(90deg,#10b981,#34d399);border-radius:3px"></div>
+          </div>
+        </div>
+        <div>
+          <div class="flex justify-between text-sm mb-1.5">
+            <span class="text-gray-400">Expenses</span>
+            <span class="text-red-400 font-medium">${editable(m.expenses,'monthly.expenses',fmt2)}</span>
+          </div>
+          <div class="bg-[#0f1116] rounded-full overflow-hidden" style="height:6px">
+            <div style="width:${expW}%;height:6px;background:linear-gradient(90deg,#ef4444,#f87171);border-radius:3px"></div>
+          </div>
+        </div>
+      </div>
+      <div class="flex gap-4 mt-4 pt-4 border-t border-gray-800">
+        <div class="flex-1 text-center">
+          <div class="text-xs text-gray-500 mb-0.5">Net Income</div>
+          <div class="font-bold ${net>=0?'text-emerald-400':'text-red-400'}">${fmt(net)}</div>
+        </div>
+        <div class="flex-1 text-center border-l border-gray-800">
+          <div class="text-xs text-gray-500 mb-0.5">Savings Rate</div>
+          <div class="font-bold ${savingsRate>=20?'text-emerald-400':'text-amber-400'}">${savingsRate}%</div>
+        </div>
+        <div class="flex-1 text-center border-l border-gray-800">
+          <div class="text-xs text-gray-500 mb-0.5">vs Last Month</div>
+          <div class="font-bold text-gray-400">↑ 51%</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- BURN RATE & RUNWAY -->
+    <div class="grid grid-cols-2 gap-3 mb-4">
+      <div class="bg-[#1d2027] rounded-2xl p-5">
+        <div class="text-xs text-gray-500 mb-1">🔥 Daily Burn Rate</div>
+        <div class="text-2xl font-bold">${fmt(dailyBurn)}</div>
+        <div class="text-xs text-gray-600 mt-1">per day</div>
+        <div class="mt-3 pt-3 border-t border-gray-800">
+          <div class="text-xs text-gray-500">Avg monthly spend</div>
+          <div class="text-sm font-medium mt-0.5">${editable(m.avgMonthlyExpenses,'monthly.avgMonthlyExpenses',fmt)}</div>
+        </div>
+      </div>
+      <div class="bg-[#1d2027] rounded-2xl p-5">
+        <div class="text-xs text-gray-500 mb-1">⏱️ Cash Runway</div>
+        <div class="text-2xl font-bold ${runway<14?'text-red-400':runway<30?'text-amber-400':'text-emerald-400'}">${runway}</div>
+        <div class="text-xs text-gray-600 mt-1">days remaining</div>
+        <div class="mt-3 pt-3 border-t border-gray-800">
+          <div class="text-xs ${runway<14?'text-red-400':runway<30?'text-amber-400':'text-gray-500'}">${runway<14?'⚠️ Income needed soon':runway<30?'Moderate cushion':'Good buffer'}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TOP CATEGORIES -->
+    <div class="bg-[#1d2027] rounded-2xl p-5 mb-4">
+      <div class="flex items-center gap-2 mb-4">
+        <span>🏆</span>
+        <span class="font-semibold">Top Spending — ${m.label}</span>
+      </div>
+      <div class="space-y-3">
+        ${m.categories.map((c,i)=>{
+          const pct = (c.amount/maxCat)*100;
+          return `<div>
+            <div class="flex justify-between items-center mb-1.5">
+              <div class="flex items-center gap-2 text-sm">
+                <span class="text-base">${c.icon}</span>
+                <span>${c.name}</span>
+                <span class="text-xs text-gray-600">#${i+1}</span>
+              </div>
+              <span class="text-sm font-medium">${editable(c.amount,`monthly.categories.${c.id}.amount`,fmt)}</span>
+            </div>
+            <div class="bg-[#0f1116] rounded-full overflow-hidden" style="height:5px">
+              <div style="width:${pct}%;height:5px;background:${c.color};border-radius:3px;opacity:0.85"></div>
+            </div>
+          </div>`;}).join('')}
+      </div>
+    </div>
+
+    <!-- SPENDING FORECAST -->
+    <div class="bg-[#1d2027] rounded-2xl p-5 mb-4">
+      <div class="flex items-center gap-2 mb-4">
+        <span>🪙</span>
+        <span class="font-semibold">Spending Forecast</span>
+      </div>
+      <div class="flex gap-2 mb-5 flex-wrap">
+        ${[7,14,21,30].map(d=>`<button class="tab-btn text-xs px-3 py-1.5 rounded-full ${state.forecastDays===d?'active':'bg-[#2a2d35] text-gray-300'}" onclick="setForecast(${d})">${d} days</button>`).join('')}
+      </div>
+      <div class="flex justify-between py-2.5 border-b border-gray-800">
+        <span class="text-sm">Current funds</span>
+        <span class="font-semibold">${fmt2(assets)}</span>
+      </div>
+      <div class="text-xs text-gray-600 font-semibold tracking-wider mt-4 mb-2">SCHEDULED INCOME</div>
+      ${forecastItems.income.length===0?`<div class="text-xs text-gray-700 py-1.5">None in this window</div>`:
+        forecastItems.income.map(r=>`<div class="flex justify-between items-center py-1.5">
+          <div class="text-sm flex items-center gap-2"><span>${r.icon}</span>${r.name}</div>
+          <div class="text-sm ${r.amount===0?'text-gray-700':'text-emerald-400'}">${r.amount===0?'—':'+ '+fmt(r.amount)}</div>
+        </div>`).join('')}
+      <div class="text-xs text-gray-600 font-semibold tracking-wider mt-4 mb-2">SCHEDULED EXPENSES</div>
+      ${forecastItems.expense.length===0?`<div class="text-xs text-gray-700 py-1.5">None in this window</div>`:
+        forecastItems.expense.map(r=>`<div class="flex justify-between items-center py-1.5">
+          <div class="text-sm flex items-center gap-2"><span>${r.icon}</span>${r.name}</div>
+          <div class="text-sm text-red-400">− ${fmt(r.amount)}</div>
+        </div>`).join('')}
+      <div class="flex justify-between items-center pt-4 mt-3 border-t border-gray-800">
+        <span class="font-semibold">Available to spend</span>
+        <span class="text-lg font-bold ${available>=0?'text-emerald-400':'text-red-400'}">${fmt2(available)}</span>
+      </div>
+    </div>
+
+    <!-- GOALS -->
+    <div class="bg-[#1d2027] rounded-2xl p-5">
+      <div class="flex items-center gap-2 mb-4">
+        <span>🎯</span>
+        <span class="font-semibold">Financial Goals</span>
+      </div>
+      ${state.goals.map(g=>{
+        const remaining = g.target-g.saved;
+        const months = monthsBetween(g.targetDate);
+        const monthly = months>0?remaining/months:0;
+        const daily = monthly/30;
+        const pct = Math.min((g.saved/g.target)*100,100);
+        const td = new Date(g.targetDate);
+        const dateLabel = td.toLocaleDateString('en-US',{month:'short',year:'numeric'});
+        return `<div class="rounded-xl p-4" style="background:#14171c">
+          <div class="flex justify-between items-start mb-3">
+            <div>
+              <div class="font-semibold">${g.icon} ${g.name}</div>
+              <div class="text-xs text-gray-500 mt-0.5">Target: ${dateLabel} · ${months} months away</div>
+            </div>
+            <div class="text-xs px-2 py-1 rounded-full bg-amber-900/30 text-amber-300">${g.status}</div>
+          </div>
+          <div class="flex justify-between text-sm mb-1.5">
+            <span class="text-gray-500">Saved so far</span>
+            <span>${editable(g.saved,`goals.${g.id}.saved`,fmt)} <span class="text-gray-500">of ${fmt(g.target)}</span></span>
+          </div>
+          <div class="bg-[#0f1116] rounded-full overflow-hidden mb-4" style="height:6px">
+            <div style="width:${pct}%;height:6px;background:linear-gradient(90deg,#f59e0b,#fbbf24);border-radius:3px"></div>
+          </div>
+          <div class="grid grid-cols-3 gap-2">
+            <div class="bg-[#1d2027] rounded-lg p-3">
+              <div class="text-xs text-gray-500">Remaining</div>
+              <div class="font-semibold mt-0.5 text-sm">${fmt(remaining)}</div>
+            </div>
+            <div class="bg-[#1d2027] rounded-lg p-3">
+              <div class="text-xs text-gray-500">Monthly needed</div>
+              <div class="font-semibold mt-0.5 text-sm">${fmt(monthly)}</div>
+            </div>
+            <div class="bg-[#1d2027] rounded-lg p-3">
+              <div class="text-xs text-gray-500">Daily needed</div>
+              <div class="font-semibold mt-0.5 text-sm">${fmt(daily)}</div>
+            </div>
+          </div>
+        </div>`;}).join('')}
+      <button class="w-full text-sm text-gray-600 mt-3 py-3 px-4 border border-dashed border-gray-800 rounded-xl hover:border-gray-600 hover:text-gray-400 transition-colors">+ Add another goal</button>
+    </div>
+
+    <div class="text-center text-xs text-gray-700 mt-8 pb-4">Click any number to edit · Changes are saved automatically</div>
+  `;
+  attachEdits();
+}
+
+render();
+</script>
+</body>
+</html>
