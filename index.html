@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -7,8 +6,6 @@
 <title>Personal Finance</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
-  html, body { overflow-x: hidden; }
-  html, body { overflow-x: hidden; }
   body { background: #14171c; color: #fff; font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif; -webkit-font-smoothing: antialiased; }
   .editable { cursor: pointer; border-radius: 4px; transition: background 0.15s; }
   .editable:hover { background: rgba(255,255,255,0.06); }
@@ -17,9 +14,7 @@
   .tab-btn { transition: all 0.15s ease; cursor: pointer; }
   .tab-btn.active { background: #fff !important; color: #14171c !important; font-weight: 600; }
   .section-label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; color: #4b5563; }
-  .nav-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
-  .nav-scroll::-webkit-scrollbar { display: none; }
-  .nav-item { padding-bottom: 11px; border-bottom: 2px solid transparent; cursor: pointer; margin-bottom: -1px; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; transition: color 0.15s; flex-shrink: 0; }
+  .nav-item { padding-bottom: 11px; border-bottom: 2px solid transparent; cursor: pointer; margin-bottom: -1px; display: flex; align-items: center; gap: 4px; white-space: nowrap; transition: color 0.15s; }
   .nav-item:hover { color: #d1d5db !important; }
   .nav-item.active { color: #818cf8 !important; border-bottom-color: #6366f1; font-weight: 600; }
   .cat-toggle { cursor: pointer; position: relative; flex-shrink: 0; border-radius: 11px; transition: background 0.2s; }
@@ -442,7 +437,7 @@ function renderNav() {
   ];
   return `
     <div class="flex items-center gap-2 text-2xl font-bold mb-1 cursor-pointer select-none" onclick="setView('dashboard')" title="Back to Dashboard">💰 Personal Finance</div>
-    <nav class="nav-scroll flex gap-5 text-sm border-b border-gray-800 mb-7">
+    <nav class="flex gap-5 text-sm border-b border-gray-800 mb-7 flex-wrap">
       ${items.map(([k,ic,lbl])=>`<span class="nav-item ${currentView===k?'active':'text-gray-500'}" onclick="setView('${k}')">${ic} ${lbl}</span>`).join('')}
     </nav>`;
 }
@@ -707,7 +702,7 @@ function renderCategories() {
       <div><div class="text-2xl font-bold mb-1">Categories</div><div class="section-label">${expCount} EXPENSE &middot; ${incCount} INCOME &middot; ${activeCount} ACTIVE IN VIEW</div></div>
       <button onclick="catOpenModal()" class="rounded-xl px-4 py-2.5 text-sm font-semibold text-white flex-shrink-0" style="background:#6366f1;border:none;cursor:pointer">+ Add Category</button>
     </div>
-    <div class="flex p-1 rounded-xl mb-5 gap-1" style="background:#0f1116;border:1px solid #1f2937">
+    <div class="inline-flex p-1 rounded-xl mb-5 gap-1" style="background:#0f1116;border:1px solid #1f2937">
       <button onclick="catSetTab('expense')" class="rounded-lg px-5 py-2 text-sm font-medium" style="${catUI.tab==='expense'?'background:#1d2027;color:#e5e7eb;border:1px solid #374151':'background:transparent;color:#6b7280;border:1px solid transparent'}">💸 Expense (${expCount})</button>
       <button onclick="catSetTab('income')" class="rounded-lg px-5 py-2 text-sm font-medium" style="${catUI.tab==='income'?'background:#1d2027;color:#e5e7eb;border:1px solid #374151':'background:transparent;color:#6b7280;border:1px solid transparent'}">💰 Income (${incCount})</button>
     </div>
