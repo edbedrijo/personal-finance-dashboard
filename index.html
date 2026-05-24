@@ -14,7 +14,10 @@
   .tab-btn { transition: all 0.15s ease; cursor: pointer; }
   .tab-btn.active { background: #fff !important; color: #14171c !important; font-weight: 600; }
   .section-label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; color: #4b5563; }
-  .nav-item { padding-bottom: 11px; border-bottom: 2px solid transparent; cursor: pointer; margin-bottom: -1px; display: flex; align-items: center; gap: 4px; white-space: nowrap; transition: color 0.15s; }
+  html, body { overflow-x: hidden; }
+  .nav-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+  .nav-scroll::-webkit-scrollbar { display: none; }
+  .nav-item { padding-bottom: 11px; border-bottom: 2px solid transparent; cursor: pointer; margin-bottom: -1px; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; transition: color 0.15s; flex-shrink: 0; }
   .nav-item:hover { color: #d1d5db !important; }
   .nav-item.active { color: #818cf8 !important; border-bottom-color: #6366f1; font-weight: 600; }
   .cat-toggle { cursor: pointer; position: relative; flex-shrink: 0; border-radius: 11px; transition: background 0.2s; }
@@ -428,18 +431,20 @@ window.txConfirmDelete = () => {
 // RENDER NAV
 // ═══════════════════════════════════════════════════════
 function renderNav() {
-  const items = [
-    ['transactions','💸','Transactions'],
-    ['accounts',    '🏦','Accounts'],
-    ['goals',       '🎯','Goals'],
-    ['categories',  '📁','Categories'],
-    ['recurring',   '🔁','Recurring'],
-  ];
+  const inTxSection = ['transactions','categories','recurring'].includes(currentView);
+  const isActive = v => v==='dashboard' ? currentView==='dashboard' : v==='transactions' ? inTxSection : currentView===v;
+  const items = [['dashboard','🏠','Home'],['transactions','💸','Transactions'],['accounts','🏦','Accounts'],['goals','🎯','Goals']];
+  const subNav = inTxSection ? `
+    <div class="flex border-b mb-5" style="border-color:#1f2937;margin-top:0">
+      ${[['transactions','Transactions'],['categories','Categories'],['recurring','Recurring']].map(([k,lbl])=>`
+        <button onclick="setView('${k}')" style="background:none;border:none;border-bottom:2px solid ${currentView===k?'#6366f1':'transparent'};cursor:pointer;padding:8px 14px;font-size:13px;font-family:inherit;color:${currentView===k?'#e5e7eb':'#6b7280'};font-weight:${currentView===k?'600':'400'};white-space:nowrap;margin-bottom:-1px">${lbl}</button>`).join('')}
+    </div>` : '<div class="mb-7"></div>';
   return `
     <div class="flex items-center gap-2 text-2xl font-bold mb-1 cursor-pointer select-none" onclick="setView('dashboard')" title="Back to Dashboard">💰 Personal Finance</div>
-    <nav class="flex gap-5 text-sm border-b border-gray-800 mb-7 flex-wrap">
-      ${items.map(([k,ic,lbl])=>`<span class="nav-item ${currentView===k?'active':'text-gray-500'}" onclick="setView('${k}')">${ic} ${lbl}</span>`).join('')}
-    </nav>`;
+    <nav class="nav-scroll flex gap-5 text-sm border-b border-gray-800 mb-0" style="padding-bottom:0">
+      ${items.map(([k,ic,lbl])=>`<span class="nav-item ${isActive(k)?'active':'text-gray-500'}" onclick="setView('${k}')">${ic} ${lbl}</span>`).join('')}
+    </nav>
+    ${subNav}`;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -523,15 +528,13 @@ function renderTransactions() {
         </div>
         <input type="hidden" id="tx-type" value="expense">
 
-        <div class="grid grid-cols-2 gap-3 mb-3">
-          <div>
-            <div class="field-label">DATE *</div>
-            <input id="tx-date" type="date" value="${todayISO}" class="field-input">
-          </div>
-          <div>
-            <div class="field-label">AMOUNT *</div>
-            <input id="tx-amount" type="number" step="0.01" min="0" placeholder="0.00" class="field-input">
-          </div>
+        <div class="mb-3">
+          <div class="field-label">DATE *</div>
+          <input id="tx-date" type="date" value="${todayISO}" class="field-input">
+        </div>
+        <div class="mb-3">
+          <div class="field-label">AMOUNT (₱) *</div>
+          <input id="tx-amount" type="number" step="0.01" min="0" placeholder="0.00" class="field-input">
         </div>
 
         <div class="mb-3">
@@ -597,14 +600,12 @@ function renderTransactions() {
 
   return `
     ${renderNav()}
-    <div class="flex items-start justify-between mb-5">
-      <div>
-        <div class="text-2xl font-bold mb-1">Transactions</div>
-        <div class="section-label">${state.transactions.length} TOTAL · ${list.length} IN VIEW</div>
-      </div>
+    <div class="flex items-center justify-between mb-1">
+      <div class="text-2xl font-bold">Transactions</div>
       <button onclick="txOpenModal()" class="rounded-xl px-4 py-2.5 text-sm font-semibold text-white flex-shrink-0"
         style="background:#6366f1;border:none;cursor:pointer">+ Add</button>
     </div>
+    <div class="section-label mb-5">${state.transactions.length} Total &nbsp;&middot;&nbsp; ${list.length} In View</div>
 
     <!-- Summary bar -->
     <div class="grid grid-cols-3 gap-3 mb-5">
@@ -698,15 +699,16 @@ function renderCategories() {
       </div>
     </div>`:'' ;
   return `${renderNav()}
-    <div class="flex items-start justify-between mb-5">
-      <div><div class="text-2xl font-bold mb-1">Categories</div><div class="section-label">${expCount} EXPENSE &middot; ${incCount} INCOME &middot; ${activeCount} ACTIVE IN VIEW</div></div>
-      <button onclick="catOpenModal()" class="rounded-xl px-4 py-2.5 text-sm font-semibold text-white flex-shrink-0" style="background:#6366f1;border:none;cursor:pointer">+ Add Category</button>
+    <div class="flex items-center justify-between mb-1">
+      <div class="text-2xl font-bold">Categories</div>
+      <button onclick="catOpenModal()" class="rounded-xl px-4 py-2.5 text-sm font-semibold text-white flex-shrink-0" style="background:#6366f1;border:none;cursor:pointer">+ Add</button>
     </div>
+    <div class="section-label mb-5">${expCount} Expense &nbsp;&middot;&nbsp; ${incCount} Income &nbsp;&middot;&nbsp; ${activeCount} Active</div>
     <div class="inline-flex p-1 rounded-xl mb-5 gap-1" style="background:#0f1116;border:1px solid #1f2937">
       <button onclick="catSetTab('expense')" class="rounded-lg px-5 py-2 text-sm font-medium" style="${catUI.tab==='expense'?'background:#1d2027;color:#e5e7eb;border:1px solid #374151':'background:transparent;color:#6b7280;border:1px solid transparent'}">💸 Expense (${expCount})</button>
       <button onclick="catSetTab('income')" class="rounded-lg px-5 py-2 text-sm font-medium" style="${catUI.tab==='income'?'background:#1d2027;color:#e5e7eb;border:1px solid #374151':'background:transparent;color:#6b7280;border:1px solid transparent'}">💰 Income (${incCount})</button>
     </div>
-    <div class="text-xs mb-4 flex flex-wrap gap-x-4 gap-y-1" style="color:#4b5563"><span>💡 Double-click name to rename &nbsp;·&nbsp; Click emoji to change &nbsp;·&nbsp; Toggle to activate/deactivate</span></div>
+    <div class="text-xs mb-4" style="color:#4b5563">💡 Double-click to rename &nbsp;·&nbsp; Click emoji to change</div>
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">${filtered.length===0?`<div class="col-span-2 text-center py-16" style="color:#6b7280"><div class="text-5xl mb-3">🗂️</div><div class="font-semibold mb-1" style="color:#9ca3af">No categories</div></div>`:cards}</div>
     ${modal}`;
 }
