@@ -1,1 +1,880 @@
 
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Personal Finance</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  html, body { overflow-x: hidden; }
+  html, body { overflow-x: hidden; }
+  body { background: #14171c; color: #fff; font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif; -webkit-font-smoothing: antialiased; }
+  .editable { cursor: pointer; border-radius: 4px; transition: background 0.15s; }
+  .editable:hover { background: rgba(255,255,255,0.06); }
+  .editable-input { background: rgba(99,102,241,0.15); border: 1px solid #6366f1; border-radius: 4px; padding: 2px 6px; color: #fff; font: inherit; outline: none; min-width: 80px; }
+  .cat-input { background: rgba(99,102,241,0.15); border: 1px solid #6366f1; border-radius: 6px; color: #fff; font: inherit; outline: none; padding: 2px 8px; }
+  .tab-btn { transition: all 0.15s ease; cursor: pointer; }
+  .tab-btn.active { background: #fff !important; color: #14171c !important; font-weight: 600; }
+  .section-label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; color: #4b5563; }
+  .nav-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+  .nav-scroll::-webkit-scrollbar { display: none; }
+  .nav-item { padding-bottom: 11px; border-bottom: 2px solid transparent; cursor: pointer; margin-bottom: -1px; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; transition: color 0.15s; flex-shrink: 0; }
+  .nav-item:hover { color: #d1d5db !important; }
+  .nav-item.active { color: #818cf8 !important; border-bottom-color: #6366f1; font-weight: 600; }
+  .cat-toggle { cursor: pointer; position: relative; flex-shrink: 0; border-radius: 11px; transition: background 0.2s; }
+  .cat-toggle-knob { position: absolute; top: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: left 0.2s; }
+  .chip { display: inline-flex; align-items: center; gap: 5px; background: #0f1116; border: 1px solid #374151; border-radius: 20px; padding: 3px 10px; font-size: 12px; color: #e5e7eb; }
+  .chip.off { background: transparent; border-color: #1f2937; opacity: 0.45; }
+  .chip-btn { background: none; border: none; color: #6b7280; cursor: pointer; font-size: 12px; padding: 0 1px; line-height: 1; }
+  .chip-btn:hover { color: #ef4444; }
+  .add-sub-input { background: #1d2027; border: 1px solid #374151; border-radius: 20px; color: #e5e7eb; outline: none; padding: 4px 12px; font-size: 12px; width: 160px; font-family: inherit; }
+  .add-sub-input:focus { border-color: #6366f1; }
+  .field-label { font-size: 11px; font-weight: 600; letter-spacing: 0.07em; color: #6b7280; text-transform: uppercase; margin-bottom: 5px; }
+  .field-input { width: 100%; background: #0f1116; border: 1px solid #374151; border-radius: 10px; color: #e5e7eb; outline: none; padding: 10px 13px; font-family: inherit; font-size: 14px; box-sizing: border-box; }
+  .field-input:focus { border-color: #6366f1; }
+  .field-select { width: 100%; background: #0f1116; border: 1px solid #374151; border-radius: 10px; color: #e5e7eb; outline: none; padding: 10px 13px; font-family: inherit; font-size: 14px; box-sizing: border-box; appearance: none; }
+  .field-select:focus { border-color: #6366f1; }
+  .tx-row { display: flex; align-items: center; gap: 12px; padding: 11px 0; border-bottom: 1px solid #1f2937; }
+  .tx-row:last-child { border-bottom: none; }
+  .tx-icon { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; background: #0f1116; }
+  ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: #14171c; } ::-webkit-scrollbar-thumb { background: #2d3139; border-radius: 3px; }
+</style>
+</head>
+<body>
+<div id="app" class="max-w-3xl mx-auto px-5 py-8"></div>
+<script>
+
+// ═══════════════════════════════════════════════════════
+// CONSTANTS
+// ═══════════════════════════════════════════════════════
+const STORAGE_KEY = 'pf_v2';
+const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const now = new Date();
+const currentMonthLabel = MONTHS[now.getMonth()] + ' ' + now.getFullYear();
+const todayISO = now.toISOString().split('T')[0];
+
+// ═══════════════════════════════════════════════════════
+// DEFAULT CATEGORIES
+// ═══════════════════════════════════════════════════════
+const defaultCategories = [
+  { id:'c1',  name:'Housing',               icon:'🏠', type:'expense', active:true,  subs:[{id:'s1',name:'Rent',active:true},{id:'s2',name:'Mortgage',active:true},{id:'s3',name:'HOA/Condo Dues',active:true},{id:'s4',name:'House Maintenance',active:true},{id:'s5',name:'Home Improvement',active:true}]},
+  { id:'c2',  name:'Food',                  icon:'🍚', type:'expense', active:true,  subs:[{id:'s10',name:'Groceries',active:true},{id:'s11',name:'Dining Out',active:true},{id:'s12',name:'Fast Food',active:true},{id:'s13',name:'Coffee Shops',active:true},{id:'s14',name:'Food Delivery',active:true}]},
+  { id:'c3',  name:'Transportation',        icon:'🚗', type:'expense', active:true,  subs:[{id:'s20',name:'Fuel',active:true},{id:'s21',name:'Car Maintenance/Repairs',active:true},{id:'s22',name:'Car Insurance',active:true},{id:'s23',name:'Public Transit',active:true},{id:'s24',name:'Parking',active:true},{id:'s25',name:'Grab/Uber',active:true}]},
+  { id:'c4',  name:'Utilities',             icon:'⚡', type:'expense', active:true,  subs:[{id:'s30',name:'Electricity',active:true},{id:'s31',name:'Water',active:true},{id:'s32',name:'Internet (Starlink)',active:true},{id:'s33',name:'Mobile Phone',active:true},{id:'s34',name:'Cable/Streaming',active:true}]},
+  { id:'c5',  name:'Healthcare',            icon:'💊', type:'expense', active:true,  subs:[{id:'s40',name:'Doctor Visits',active:true},{id:'s41',name:'Dental Care',active:true},{id:'s42',name:'Prescription Meds',active:true},{id:'s43',name:'Vitamins',active:true},{id:'s44',name:'Hospital Bills',active:true},{id:'s45',name:'Life Insurance',active:true},{id:'s46',name:'Health Insurance',active:true}]},
+  { id:'c6',  name:'Personal Care',         icon:'💆', type:'expense', active:true,  subs:[{id:'s50',name:'Haircut/Salon',active:true},{id:'s51',name:'Gym',active:true},{id:'s52',name:'Skincare',active:true},{id:'s53',name:'Hygiene Products',active:true},{id:'s54',name:'Massage',active:true},{id:'s55',name:'Laundry',active:true}]},
+  { id:'c7',  name:'People & Support',      icon:'👨‍👩‍👧', type:'expense', active:true,  subs:[{id:'s60',name:'Wife Expenses',active:true},{id:'s61',name:'Parents Support',active:true},{id:'s62',name:'Siblings',active:true},{id:'s63',name:'Extended Family',active:true},{id:'s64',name:'Helper Salary',active:true}]},
+  { id:'c8',  name:'Pets',                  icon:'🐱', type:'expense', active:true,  subs:[{id:'s70',name:'Pet Food',active:true},{id:'s71',name:'Vet/Check-up',active:true},{id:'s72',name:'Grooming',active:true},{id:'s73',name:'Pet Supplies',active:true},{id:'s74',name:'Cat Litter',active:true}]},
+  { id:'c9',  name:'Shopping',              icon:'🛍️', type:'expense', active:true,  subs:[{id:'s80',name:'Shopee/Lazada/TikTok',active:true},{id:'s81',name:'Clothes & Shoes',active:true},{id:'s82',name:'Electronics',active:true},{id:'s83',name:'Household Items',active:true}]},
+  { id:'c10', name:'Entertainment',         icon:'🎬', type:'expense', active:true,  subs:[{id:'s90',name:'Subscriptions',active:true},{id:'s91',name:'Movies/Events',active:true},{id:'s92',name:'Hobbies',active:true},{id:'s93',name:'Games',active:true}]},
+  { id:'c11', name:'Travel',                icon:'✈️', type:'expense', active:true,  subs:[{id:'s100',name:'Flights',active:true},{id:'s101',name:'Accommodation',active:true},{id:'s102',name:'Activities/Tours',active:true},{id:'s103',name:'Travel Food',active:true},{id:'s104',name:'Travel Misc',active:true}]},
+  { id:'c12', name:'Business Expenses',     icon:'💼', type:'expense', active:true,  subs:[{id:'s110',name:'Outsourcing/Payroll',active:true},{id:'s111',name:'Software & Tools',active:true},{id:'s112',name:'Marketing/Ads',active:true},{id:'s113',name:'Domain/Hosting',active:true}]},
+  { id:'c13', name:'Savings & Investments', icon:'💰', type:'expense', active:true,  subs:[{id:'s120',name:'Car Downpayment',active:true},{id:'s121',name:'Emergency Fund',active:true},{id:'s122',name:'Savings Transfer',active:true}]},
+  { id:'c14', name:'Miscellaneous',         icon:'❓', type:'expense', active:true,  subs:[{id:'s130',name:'Uncategorized',active:true},{id:'s131',name:'Gifts',active:true},{id:'s132',name:'Church/Offerings',active:true},{id:'s133',name:'Charity',active:true},{id:'s134',name:'Others',active:true}]},
+  { id:'c15', name:'Freelance',             icon:'💻', type:'income',  active:true,  subs:[{id:'s140',name:'Upwork',active:true},{id:'s141',name:'Direct Client',active:true}]},
+  { id:'c16', name:'Business',              icon:'📈', type:'income',  active:true,  subs:[{id:'s150',name:'Brickell Ads',active:true},{id:'s151',name:'Other Business',active:true}]},
+  { id:'c17', name:'Passive Income',        icon:'🏦', type:'income',  active:false, subs:[{id:'s160',name:'Investments',active:true},{id:'s161',name:'Interest',active:true},{id:'s162',name:'Dividends',active:true}]},
+  { id:'c18', name:'Other Income',          icon:'🎁', type:'income',  active:true,  subs:[{id:'s170',name:'Refunds',active:true},{id:'s171',name:"Wife's Share",active:true},{id:'s172',name:'Loan Repayments',active:true},{id:'s173',name:'Received Gifts',active:true}]},
+];
+
+// ═══════════════════════════════════════════════════════
+// DEFAULT TRANSACTIONS — May 2026 pre-loaded from Google Sheets
+// ═══════════════════════════════════════════════════════
+const defaultTransactions = [
+  // ── INCOME ──
+  {id:'tx_i1', date:'2026-05-01', description:'Brickell Ads',              type:'income',  amount:66915.73, categoryId:'c16', subcategoryId:'s150', accountId:'unionbank',    notes:''},
+  {id:'tx_i2', date:'2026-05-07', description:'Upwork',                    type:'income',  amount:13901.04, categoryId:'c15', subcategoryId:'s140', accountId:'unionbank',    notes:''},
+  {id:'tx_i3', date:'2026-05-11', description:'Love',                      type:'income',  amount:10000.00, categoryId:'c18', subcategoryId:'s171', accountId:'gcash',         notes:"Wife's share"},
+  {id:'tx_i4', date:'2026-05-11', description:'Upwork',                    type:'income',  amount:13793.42, categoryId:'c15', subcategoryId:'s140', accountId:'unionbank',    notes:''},
+  {id:'tx_i5', date:'2026-05-18', description:'Brickell Ads',              type:'income',  amount:67331.39, categoryId:'c16', subcategoryId:'s150', accountId:'unionbank',    notes:''},
+  // ── EXPENSES ──
+  {id:'tx_e1',  date:'2026-05-01', description:'Cherry Pie Repair Lower Arm', type:'expense', amount:3980.00,  categoryId:'c3',  subcategoryId:'s21',  accountId:'unionbank',  notes:''},
+  {id:'tx_e2',  date:'2026-05-01', description:'Padyak',                       type:'expense', amount:50.00,    categoryId:'c3',  subcategoryId:'s23',  accountId:'cash',        notes:''},
+  {id:'tx_e3',  date:'2026-05-01', description:'Yashano',                      type:'expense', amount:404.00,   categoryId:'c14', subcategoryId:'s130', accountId:'cash',        notes:''},
+  {id:'tx_e4',  date:'2026-05-01', description:'Ace Hardware',                 type:'expense', amount:636.00,   categoryId:'c14', subcategoryId:'s130', accountId:'cash',        notes:''},
+  {id:'tx_e5',  date:'2026-05-01', description:'Prednisone',                   type:'expense', amount:118.00,   categoryId:'c5',  subcategoryId:'s42',  accountId:'cash',        notes:''},
+  {id:'tx_e6',  date:'2026-05-01', description:'Takoyaki',                     type:'expense', amount:120.00,   categoryId:'c2',  subcategoryId:'s11',  accountId:'cash',        notes:''},
+  {id:'tx_e7',  date:'2026-05-02', description:'Gym',                          type:'expense', amount:260.00,   categoryId:'c6',  subcategoryId:'s51',  accountId:'cash',        notes:''},
+  {id:'tx_e8',  date:'2026-05-02', description:'Jco',                          type:'expense', amount:273.00,   categoryId:'c2',  subcategoryId:'s13',  accountId:'gcash',       notes:''},
+  {id:'tx_e9',  date:'2026-05-02', description:'Facial SM',                    type:'expense', amount:3459.00,  categoryId:'c6',  subcategoryId:'s50',  accountId:'securitybank',notes:''},
+  {id:'tx_e10', date:'2026-05-02', description:'Landers',                      type:'expense', amount:3743.26,  categoryId:'c2',  subcategoryId:'s10',  accountId:'securitybank',notes:''},
+  {id:'tx_e11', date:'2026-05-02', description:'Landers Dinner',               type:'expense', amount:503.00,   categoryId:'c2',  subcategoryId:'s11',  accountId:'securitybank',notes:''},
+  {id:'tx_e12', date:'2026-05-03', description:'Chowking',                     type:'expense', amount:378.00,   categoryId:'c2',  subcategoryId:'s12',  accountId:'cash',        notes:''},
+  {id:'tx_e13', date:'2026-05-03', description:'Dinner Jollibee',              type:'expense', amount:624.00,   categoryId:'c2',  subcategoryId:'s12',  accountId:'cash',        notes:''},
+  {id:'tx_e14', date:'2026-05-07', description:'Love Upwork',                  type:'expense', amount:9434.80,  categoryId:'c12', subcategoryId:'s110', accountId:'unionbank',   notes:'Outsourcing'},
+  {id:'tx_e15', date:'2026-05-10', description:'Dan Eric',                     type:'expense', amount:525.00,   categoryId:'c2',  subcategoryId:'s11',  accountId:'cash',        notes:''},
+  {id:'tx_e16', date:'2026-05-10', description:'Laundry',                      type:'expense', amount:725.00,   categoryId:'c6',  subcategoryId:'s55',  accountId:'cash',        notes:''},
+  {id:'tx_e17', date:'2026-05-10', description:'SnR',                          type:'expense', amount:2747.22,  categoryId:'c2',  subcategoryId:'s10',  accountId:'securitybank',notes:''},
+  {id:'tx_e18', date:'2026-05-10', description:'Landers',                      type:'expense', amount:3890.09,  categoryId:'c2',  subcategoryId:'s10',  accountId:'securitybank',notes:''},
+  {id:'tx_e19', date:'2026-05-10', description:'Catanduanes Trip',             type:'expense', amount:33669.92, categoryId:'c11', subcategoryId:'s104', accountId:'unionbank',   notes:''},
+  {id:'tx_e20', date:'2026-05-11', description:'Gas Cherry Pie',               type:'expense', amount:1844.66,  categoryId:'c3',  subcategoryId:'s20',  accountId:'gcash',       notes:''},
+  {id:'tx_e21', date:'2026-05-11', description:'Gym',                          type:'expense', amount:160.00,   categoryId:'c6',  subcategoryId:'s51',  accountId:'cash',        notes:''},
+  {id:'tx_e22', date:'2026-05-13', description:'Landers Grocery',              type:'expense', amount:1463.48,  categoryId:'c2',  subcategoryId:'s10',  accountId:'securitybank',notes:''},
+  {id:'tx_e23', date:'2026-05-13', description:'Gym',                          type:'expense', amount:180.00,   categoryId:'c6',  subcategoryId:'s51',  accountId:'cash',        notes:''},
+  {id:'tx_e24', date:'2026-05-13', description:'Bbq and Mango',                type:'expense', amount:400.00,   categoryId:'c2',  subcategoryId:'s11',  accountId:'cash',        notes:''},
+  {id:'tx_e25', date:'2026-05-14', description:'Kuya J',                       type:'expense', amount:1143.84,  categoryId:'c2',  subcategoryId:'s11',  accountId:'cash',        notes:''},
+  {id:'tx_e26', date:'2026-05-15', description:'Rent',                         type:'expense', amount:22000.00, categoryId:'c1',  subcategoryId:'s1',   accountId:'unionbank',   notes:''},
+  {id:'tx_e27', date:'2026-05-16', description:'Gym',                          type:'expense', amount:160.00,   categoryId:'c6',  subcategoryId:'s51',  accountId:'cash',        notes:''},
+  {id:'tx_e28', date:'2026-05-16', description:'Cherry Pie Parts',             type:'expense', amount:186.00,   categoryId:'c3',  subcategoryId:'s21',  accountId:'cash',        notes:''},
+  {id:'tx_e29', date:'2026-05-17', description:'Claude',                       type:'expense', amount:1430.78,  categoryId:'c12', subcategoryId:'s111', accountId:'unionbank',   notes:'Claude AI subscription'},
+  {id:'tx_e30', date:'2026-05-17', description:'Foodpanda',                    type:'expense', amount:361.00,   categoryId:'c2',  subcategoryId:'s14',  accountId:'gcash',       notes:''},
+  {id:'tx_e31', date:'2026-05-17', description:'Foodpanda',                    type:'expense', amount:323.00,   categoryId:'c2',  subcategoryId:'s14',  accountId:'gcash',       notes:''},
+  {id:'tx_e32', date:'2026-05-17', description:'Ate Annie Sweldo',             type:'expense', amount:3100.00,  categoryId:'c7',  subcategoryId:'s64',  accountId:'cash',        notes:'Helper salary'},
+  {id:'tx_e33', date:'2026-05-17', description:'Starlink',                     type:'expense', amount:3000.00,  categoryId:'c4',  subcategoryId:'s32',  accountId:'unionbank',   notes:''},
+  {id:'tx_e34', date:'2026-05-17', description:'Mama Grocery',                 type:'expense', amount:5000.00,  categoryId:'c7',  subcategoryId:'s61',  accountId:'cash',        notes:''},
+  {id:'tx_e35', date:'2026-05-18', description:'SnR',                          type:'expense', amount:4242.77,  categoryId:'c2',  subcategoryId:'s10',  accountId:'securitybank',notes:''},
+  {id:'tx_e36', date:'2026-05-18', description:'SM Grocery',                   type:'expense', amount:679.65,   categoryId:'c2',  subcategoryId:'s10',  accountId:'securitybank',notes:''},
+  {id:'tx_e37', date:'2026-05-19', description:'Gym',                          type:'expense', amount:160.00,   categoryId:'c6',  subcategoryId:'s51',  accountId:'cash',        notes:''},
+  {id:'tx_e38', date:'2026-05-20', description:'Foodpanda',                    type:'expense', amount:579.00,   categoryId:'c2',  subcategoryId:'s14',  accountId:'gcash',       notes:''},
+  {id:'tx_e39', date:'2026-05-20', description:'Foodpanda',                    type:'expense', amount:374.00,   categoryId:'c2',  subcategoryId:'s13',  accountId:'gcash',       notes:'Coffee'},
+  {id:'tx_e40', date:'2026-05-21', description:'Pechat and Egg',               type:'expense', amount:350.00,   categoryId:'c2',  subcategoryId:'s10',  accountId:'cash',        notes:''},
+  {id:'tx_e41', date:'2026-05-21', description:'Love Meds and My Vitamins',    type:'expense', amount:605.30,   categoryId:'c5',  subcategoryId:'s43',  accountId:'cash',        notes:''},
+  {id:'tx_e42', date:'2026-05-21', description:'Water Bill',                   type:'expense', amount:172.16,   categoryId:'c4',  subcategoryId:'s31',  accountId:'unionbank',   notes:''},
+  {id:'tx_e43', date:'2026-05-22', description:'Gym',                          type:'expense', amount:80.00,    categoryId:'c6',  subcategoryId:'s51',  accountId:'cash',        notes:''},
+  {id:'tx_e44', date:'2026-05-22', description:'Carwash',                      type:'expense', amount:330.00,   categoryId:'c3',  subcategoryId:'s21',  accountId:'cash',        notes:''},
+  {id:'tx_e45', date:'2026-05-22', description:'Tubig',                        type:'expense', amount:140.00,   categoryId:'c4',  subcategoryId:'s31',  accountId:'cash',        notes:''},
+  {id:'tx_e46', date:'2026-05-22', description:'Tinapay',                      type:'expense', amount:51.00,    categoryId:'c2',  subcategoryId:'s13',  accountId:'cash',        notes:''},
+  {id:'tx_e47', date:'2026-05-22', description:'Gas Cherry Pie',               type:'expense', amount:1746.61,  categoryId:'c3',  subcategoryId:'s20',  accountId:'gcash',       notes:''},
+  {id:'tx_e48', date:'2026-05-22', description:'Laundry',                      type:'expense', amount:705.00,   categoryId:'c6',  subcategoryId:'s55',  accountId:'cash',        notes:''},
+  {id:'tx_e49', date:'2026-05-22', description:'Mcdo Kuya Caloy',              type:'expense', amount:489.00,   categoryId:'c2',  subcategoryId:'s12',  accountId:'cash',        notes:''},
+  {id:'tx_e50', date:'2026-05-23', description:'Mcdo Sipocot',                 type:'expense', amount:323.00,   categoryId:'c2',  subcategoryId:'s12',  accountId:'cash',        notes:''},
+  {id:'tx_e51', date:'2026-05-23', description:'Titit',                        type:'expense', amount:500.00,   categoryId:'c7',  subcategoryId:'s62',  accountId:'cash',        notes:''},
+  {id:'tx_e52', date:'2026-05-23', description:'Maryann',                      type:'expense', amount:400.00,   categoryId:'c7',  subcategoryId:'s62',  accountId:'cash',        notes:''},
+  {id:'tx_e53', date:'2026-05-23', description:'Dentist',                      type:'expense', amount:1500.00,  categoryId:'c5',  subcategoryId:'s41',  accountId:'cash',        notes:''},
+  {id:'tx_e54', date:'2026-05-23', description:'Dinner',                       type:'expense', amount:500.00,   categoryId:'c2',  subcategoryId:'s11',  accountId:'cash',        notes:''},
+  {id:'tx_e55', date:'2026-05-23', description:'Takoyaki',                     type:'expense', amount:204.00,   categoryId:'c2',  subcategoryId:'s11',  accountId:'cash',        notes:''},
+  {id:'tx_e56', date:'2026-05-24', description:'Cat Food',                     type:'expense', amount:1400.00,  categoryId:'c8',  subcategoryId:'s70',  accountId:'cash',        notes:''},
+  {id:'tx_e57', date:'2026-05-24', description:'Uniqlo',                       type:'expense', amount:3550.00,  categoryId:'c9',  subcategoryId:'s81',  accountId:'securitybank',notes:''},
+  {id:'tx_e58', date:'2026-05-24', description:'Vacuum',                       type:'expense', amount:4197.00,  categoryId:'c9',  subcategoryId:'s83',  accountId:'securitybank',notes:''},
+];
+
+// ═══════════════════════════════════════════════════════
+// DEFAULT STATE
+// ═══════════════════════════════════════════════════════
+const defaultState = {
+  accounts: [
+    { id:'unionbank',    name:'Unionbank',     balance:33169.02 },
+    { id:'securitybank', name:'Security Bank', balance:35693.34 },
+    { id:'maribank',     name:'Maribank',      balance:2617.00  },
+    { id:'gcash',        name:'GCash',         balance:1478.03  },
+    { id:'maya',         name:'Maya',          balance:547.56   },
+    { id:'cash',         name:'Cash on hand',  balance:1000.00  },
+  ],
+  creditCards: [
+    { id:'unionbankCC', name:'Unionbank CC',     outstanding:53206.58, limit:470000, dueDay:25 },
+    { id:'securityCC',  name:'Security Bank CC', outstanding:17.00,    limit:50000,  dueDay:25 },
+  ],
+  monthly: {
+    label: currentMonthLabel,
+    income: 171941.58,
+    expenses: 129571.54,
+    avgMonthlyExpenses: 150000,
+    categories: [
+      { id:'mc1', name:'Travel',         icon:'✈️',  amount:33669, color:'#6366f1' },
+      { id:'mc2', name:'Food',           icon:'🍚',  amount:22648, color:'#f59e0b' },
+      { id:'mc3', name:'Housing',        icon:'🏠',  amount:22000, color:'#10b981' },
+      { id:'mc4', name:'Transportation', icon:'🚗',  amount:8137,  color:'#3b82f6' },
+      { id:'mc5', name:'Family Support', icon:'👨‍👩‍👧', amount:8100,  color:'#ec4899' },
+    ]
+  },
+  recurring: [
+    { id:'r1', name:'Rent',                 amount:22000, dueDay:1,  type:'expense', icon:'🏠', variable:false },
+    { id:'r2', name:'Starlink',             amount:2500,  dueDay:5,  type:'expense', icon:'🌐', variable:false },
+    { id:'r3', name:'Parents support',      amount:5000,  dueDay:10, type:'expense', icon:'👨‍👩‍👧', variable:false },
+    { id:'r4', name:'Ate Annie salary',     amount:6000,  dueDay:15, type:'expense', icon:'👵', variable:false },
+    { id:'r5', name:'Unionbank CC bill',    amount:13692, dueDay:25, type:'expense', icon:'💳', variable:true  },
+    { id:'r6', name:'Upwork payout',        amount:0,     dueDay:7,  type:'income',  icon:'💼', variable:true  },
+    { id:'r7', name:'Brickell Ads revenue', amount:0,     dueDay:1,  type:'income',  icon:'📈', variable:true  },
+  ],
+  goals: [
+    { id:'g1', name:'Car downpayment', icon:'🚗', target:500000, saved:50000, targetDate:'2026-12-31', status:'In progress' }
+  ],
+  forecastDays: 7,
+  categories: defaultCategories,
+  transactions: defaultTransactions,
+};
+
+// ═══════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════
+let state = (() => {
+  try {
+    const s = localStorage.getItem(STORAGE_KEY);
+    if (s) {
+      const p = JSON.parse(s);
+      if (!p.categories)    p.categories    = JSON.parse(JSON.stringify(defaultCategories));
+      if (!p.transactions)  p.transactions  = JSON.parse(JSON.stringify(defaultTransactions));
+      return p;
+    }
+  } catch(e) {}
+  return JSON.parse(JSON.stringify(defaultState));
+})();
+
+const save = () => { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch(e){} };
+
+// ═══════════════════════════════════════════════════════
+// UI STATE
+// ═══════════════════════════════════════════════════════
+let currentView = 'dashboard';
+let catUI  = { tab:'expense', expanded:null, showModal:false };
+let txUI   = { filter:'month', showModal:false, deleteId:null };
+
+// ═══════════════════════════════════════════════════════
+// UTILITIES
+// ═══════════════════════════════════════════════════════
+const fmt  = n => '₱' + Math.round(n).toLocaleString('en-PH');
+const fmt2 = n => '₱' + n.toLocaleString('en-PH', {minimumFractionDigits:2, maximumFractionDigits:2});
+const sfx  = d => d>3&&d<21?'th':{1:'st',2:'nd',3:'rd'}[d%10]||'th';
+const totalAssets = () => state.accounts.reduce((s,a)=>s+a.balance,0);
+const totalLiab   = () => state.creditCards.reduce((s,c)=>s+c.outstanding,0);
+const netWorth    = () => totalAssets()-totalLiab();
+
+function daysUntil(dueDay) {
+  const d = now.getDate();
+  if (dueDay >= d) return dueDay - d;
+  const next = new Date(now.getFullYear(), now.getMonth()+1, dueDay);
+  return Math.ceil((next - now)/(1000*60*60*24));
+}
+function monthsBetween(ds) {
+  const t = new Date(ds);
+  return Math.max((t.getFullYear()-now.getFullYear())*12+(t.getMonth()-now.getMonth()),0);
+}
+function fmtDate(iso) {
+  const d = new Date(iso + 'T00:00:00');
+  return d.toLocaleDateString('en-PH', { month:'short', day:'numeric', year:'numeric' });
+}
+function fmtDateShort(iso) {
+  const d = new Date(iso + 'T00:00:00');
+  return d.toLocaleDateString('en-PH', { month:'short', day:'numeric' });
+}
+
+// ── Dashboard data: auto-calculate from transactions if available ──
+function getMonthlyData() {
+  const yr = now.getFullYear(), mo = now.getMonth();
+  const monthTx = state.transactions.filter(t => {
+    const d = new Date(t.date + 'T00:00:00');
+    return d.getFullYear()===yr && d.getMonth()===mo;
+  });
+  if (monthTx.length === 0) return state.monthly;
+
+  const income   = monthTx.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount, 0);
+  const expenses = monthTx.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount, 0);
+
+  // Top categories from transactions
+  const catMap = {};
+  monthTx.filter(t=>t.type==='expense').forEach(t => {
+    if (!t.categoryId) return;
+    if (!catMap[t.categoryId]) catMap[t.categoryId] = 0;
+    catMap[t.categoryId] += t.amount;
+  });
+  const palette = ['#6366f1','#f59e0b','#10b981','#3b82f6','#ec4899','#8b5cf6','#06b6d4'];
+  const topCats = Object.entries(catMap)
+    .sort((a,b)=>b[1]-a[1]).slice(0,5)
+    .map(([cid,amt],i) => {
+      const cat = state.categories.find(c=>c.id===cid);
+      return { id:'mc_'+cid, name:cat?.name||'Other', icon:cat?.icon||'❓', amount:Math.round(amt), color:palette[i]||'#6b7280' };
+    });
+
+  return { ...state.monthly, income, expenses, categories: topCats.length ? topCats : state.monthly.categories };
+}
+
+function editable(value, path, formatter) {
+  const disp = (value===0) ? '—' : (formatter?formatter(value):value);
+  return `<span class="editable px-1" data-path="${path}" data-val="${value}">${disp}</span>`;
+}
+function attachEdits() {
+  document.querySelectorAll('[data-path]').forEach(el => {
+    el.addEventListener('click', e => {
+      e.stopPropagation();
+      const path = el.dataset.path;
+      const inp = document.createElement('input');
+      inp.type='number'; inp.step='0.01'; inp.value=parseFloat(el.dataset.val); inp.className='editable-input';
+      el.replaceWith(inp); inp.focus(); inp.select();
+      const commit = () => { const v=parseFloat(inp.value); if(!isNaN(v)) setPath(path,v); render(); };
+      inp.addEventListener('blur', commit);
+      inp.addEventListener('keydown', ev => { if(ev.key==='Enter') commit(); if(ev.key==='Escape') render(); });
+    });
+  });
+}
+function setPath(path, val) {
+  const [col,...rest] = path.split('.');
+  if (col==='accounts') {
+    const [id,field]=rest; const item=state.accounts.find(x=>x.id===id); if(item) item[field]=val;
+  } else if (col==='creditCards') {
+    const [id,field]=rest; const item=state.creditCards.find(x=>x.id===id); if(item) item[field]=val;
+  } else if (col==='monthly') {
+    const [field,id,prop]=rest;
+    if (field==='categories') { const item=state.monthly.categories.find(x=>x.id===id); if(item) item[prop]=val; }
+    else state.monthly[field]=val;
+  } else if (col==='goals') {
+    const [id,field]=rest; const item=state.goals.find(x=>x.id===id); if(item) item[field]=val;
+  }
+  save();
+}
+
+// ═══════════════════════════════════════════════════════
+// NAVIGATION
+// ═══════════════════════════════════════════════════════
+window.setView     = v => { currentView=v; render(); window.scrollTo(0,0); };
+window.setForecast = d => { state.forecastDays=d; save(); render(); };
+
+// ═══════════════════════════════════════════════════════
+// CATEGORY ACTIONS
+// ═══════════════════════════════════════════════════════
+window.catSetTab        = t  => { catUI.tab=t; catUI.expanded=null; render(); };
+window.catToggleExpand  = id => { catUI.expanded=catUI.expanded===id?null:id; render(); };
+window.catOpenModal     = () => { catUI.showModal=true; render(); setTimeout(()=>document.getElementById('modal-name')?.focus(),60); };
+window.catCloseModal    = () => { catUI.showModal=false; render(); };
+window.catToggle = id => { const c=state.categories.find(x=>x.id===id); if(c){c.active=!c.active;save();render();} };
+window.catToggleSub = (cid,sid) => { const c=state.categories.find(x=>x.id===cid); if(c){const s=c.subs.find(x=>x.id===sid);if(s){s.active=!s.active;save();render();}} };
+window.catDeleteSub = (cid,sid) => { const c=state.categories.find(x=>x.id===cid); if(c){c.subs=c.subs.filter(x=>x.id!==sid);save();render();} };
+window.catAddFromModal = () => {
+  const name=document.getElementById('modal-name').value.trim();
+  const icon=document.getElementById('modal-icon').value.trim()||'🗂️';
+  if(!name)return;
+  state.categories.push({id:'c'+Date.now(),name,icon,type:catUI.tab,active:true,subs:[]});
+  save(); catUI.showModal=false; render();
+};
+window.catAddSub = cid => {
+  const inp=document.getElementById('new-sub-'+cid); if(!inp)return;
+  const name=inp.value.trim(); if(!name)return;
+  const c=state.categories.find(x=>x.id===cid);
+  if(c){c.subs.push({id:'s'+Date.now(),name,active:true});save();catUI.expanded=cid;render();}
+};
+window.catStartRenameCategory = id => {
+  const c=state.categories.find(x=>x.id===id); if(!c)return;
+  const el=document.getElementById('cat-name-'+id); if(!el)return;
+  const inp=document.createElement('input');
+  inp.className='cat-input'; inp.value=c.name; inp.style.cssText='font-size:14px;font-weight:600;width:150px';
+  el.replaceWith(inp); inp.focus(); inp.select();
+  const done=()=>{c.name=inp.value.trim()||c.name;save();render();};
+  inp.onblur=done; inp.onkeydown=e=>{if(e.key==='Enter')done();if(e.key==='Escape')render();};
+};
+window.catStartRenameIcon = id => {
+  const c=state.categories.find(x=>x.id===id); if(!c)return;
+  const el=document.getElementById('cat-icon-'+id); if(!el)return;
+  const inp=document.createElement('input');
+  inp.className='cat-input'; inp.value=c.icon; inp.style.cssText='font-size:20px;width:44px;text-align:center;padding:4px';
+  el.innerHTML=''; el.appendChild(inp); inp.focus(); inp.select();
+  const done=()=>{c.icon=inp.value.trim()||c.icon;save();render();};
+  inp.onblur=done; inp.onkeydown=e=>{if(e.key==='Enter')done();if(e.key==='Escape')render();};
+};
+window.catStartRenameSub = (cid,sid) => {
+  const c=state.categories.find(x=>x.id===cid); if(!c)return;
+  const s=c.subs.find(x=>x.id===sid); if(!s)return;
+  const el=document.getElementById('sub-name-'+sid); if(!el)return;
+  const inp=document.createElement('input');
+  inp.className='cat-input'; inp.value=s.name; inp.style.cssText='font-size:12px;width:110px';
+  el.replaceWith(inp); inp.focus(); inp.select();
+  const done=()=>{s.name=inp.value.trim()||s.name;save();catUI.expanded=cid;render();};
+  inp.onblur=done; inp.onkeydown=e=>{if(e.key==='Enter')done();if(e.key==='Escape'){catUI.expanded=cid;render();}};
+};
+
+// ═══════════════════════════════════════════════════════
+// TRANSACTION ACTIONS
+// ═══════════════════════════════════════════════════════
+window.txSetFilter  = f => { txUI.filter=f; render(); };
+window.txOpenModal  = () => { txUI.showModal=true; txUI.deleteId=null; render(); setTimeout(()=>document.getElementById('tx-desc')?.focus(),60); };
+window.txCloseModal = () => { txUI.showModal=false; render(); };
+
+window.txUpdateCatDropdown = () => {
+  const type = document.getElementById('tx-type').value;
+  const catSel = document.getElementById('tx-cat');
+  const subSel = document.getElementById('tx-subcat');
+  if (!catSel) return;
+  catSel.innerHTML = '<option value="">— Select category —</option>';
+  state.categories.filter(c=>c.type===type && c.active).forEach(c => {
+    catSel.innerHTML += `<option value="${c.id}">${c.icon} ${c.name}</option>`;
+  });
+  subSel.innerHTML = '<option value="">— Select subcategory —</option>';
+};
+
+window.txUpdateSubDropdown = () => {
+  const catId = document.getElementById('tx-cat').value;
+  const subSel = document.getElementById('tx-subcat');
+  if (!subSel) return;
+  const cat = state.categories.find(c=>c.id===catId);
+  subSel.innerHTML = '<option value="">— Select subcategory (optional) —</option>';
+  if (cat) cat.subs.filter(s=>s.active).forEach(s => {
+    subSel.innerHTML += `<option value="${s.id}">${s.name}</option>`;
+  });
+};
+
+window.txSave = () => {
+  const desc  = document.getElementById('tx-desc').value.trim();
+  const type  = document.getElementById('tx-type').value;
+  const date  = document.getElementById('tx-date').value;
+  const amt   = parseFloat(document.getElementById('tx-amount').value);
+  const catId = document.getElementById('tx-cat').value;
+  const subId = document.getElementById('tx-subcat').value;
+  const accId = document.getElementById('tx-account').value;
+  const notes = document.getElementById('tx-notes').value.trim();
+  if (!desc || !date || isNaN(amt) || amt <= 0 || !catId || !accId) {
+    document.getElementById('tx-error').textContent = 'Please fill in all required fields.';
+    return;
+  }
+  state.transactions.push({
+    id: 'tx_'+Date.now(),
+    date, description: desc, type, amount: amt,
+    categoryId: catId, subcategoryId: subId, accountId: accId, notes
+  });
+  save(); txUI.showModal=false; render();
+};
+
+window.txAskDelete = id => { txUI.deleteId=id; render(); };
+window.txCancelDelete = () => { txUI.deleteId=null; render(); };
+window.txConfirmDelete = () => {
+  state.transactions = state.transactions.filter(t=>t.id!==txUI.deleteId);
+  save(); txUI.deleteId=null; render();
+};
+
+// ═══════════════════════════════════════════════════════
+// RENDER NAV
+// ═══════════════════════════════════════════════════════
+function renderNav() {
+  const items = [
+    ['transactions','💸','Transactions'],
+    ['accounts',    '🏦','Accounts'],
+    ['goals',       '🎯','Goals'],
+    ['categories',  '📁','Categories'],
+    ['recurring',   '🔁','Recurring'],
+  ];
+  return `
+    <div class="flex items-center gap-2 text-2xl font-bold mb-1 cursor-pointer select-none" onclick="setView('dashboard')" title="Back to Dashboard">💰 Personal Finance</div>
+    <nav class="nav-scroll flex gap-5 text-sm border-b border-gray-800 mb-7">
+      ${items.map(([k,ic,lbl])=>`<span class="nav-item ${currentView===k?'active':'text-gray-500'}" onclick="setView('${k}')">${ic} ${lbl}</span>`).join('')}
+    </nav>`;
+}
+
+// ═══════════════════════════════════════════════════════
+// RENDER TRANSACTIONS
+// ═══════════════════════════════════════════════════════
+function renderTransactions() {
+  // Filter transactions
+  const yr = now.getFullYear(), mo = now.getMonth();
+  let list = [...state.transactions].sort((a,b)=>new Date(b.date)-new Date(a.date));
+  if (txUI.filter==='month') list = list.filter(t=>{ const d=new Date(t.date+'T00:00:00'); return d.getFullYear()===yr&&d.getMonth()===mo; });
+  else if (txUI.filter==='expense') list = list.filter(t=>t.type==='expense');
+  else if (txUI.filter==='income')  list = list.filter(t=>t.type==='income');
+
+  const totalIncome   = list.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0);
+  const totalExpense  = list.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
+  const net = totalIncome - totalExpense;
+
+  // Group by date
+  const grouped = {};
+  list.forEach(t => { if(!grouped[t.date]) grouped[t.date]=[]; grouped[t.date].push(t); });
+  const sortedDates = Object.keys(grouped).sort((a,b)=>new Date(b)-new Date(a));
+
+  const rowsHTML = sortedDates.map(date => {
+    const rows = grouped[date].map(tx => {
+      const cat    = state.categories.find(c=>c.id===tx.categoryId);
+      const subcat = cat?.subs.find(s=>s.id===tx.subcategoryId);
+      const isDeleting = txUI.deleteId === tx.id;
+      if (isDeleting) return `
+        <div class="tx-row" style="background:#1a0f0f;border-radius:10px;padding:10px 12px;margin:4px 0;border:1px solid #7f1d1d">
+          <div class="flex-1 text-sm" style="color:#fca5a5">Delete <strong>${tx.description}</strong> (${fmt(tx.amount)})? This cannot be undone.</div>
+          <div class="flex gap-2 flex-shrink-0">
+            <button onclick="txConfirmDelete()" class="text-xs px-3 py-1.5 rounded-lg font-semibold" style="background:#ef4444;border:none;color:#fff;cursor:pointer">Delete</button>
+            <button onclick="txCancelDelete()" class="text-xs px-3 py-1.5 rounded-lg" style="background:#374151;border:none;color:#9ca3af;cursor:pointer">Cancel</button>
+          </div>
+        </div>`;
+      return `
+        <div class="tx-row">
+          <div class="tx-icon">${cat?.icon||'💸'}</div>
+          <div class="flex-1 min-w-0">
+            <div class="text-sm font-medium truncate" style="color:#e5e7eb">${tx.description}</div>
+            <div class="text-xs mt-0.5" style="color:#6b7280">${cat?.name||''}${subcat?' · '+subcat.name:''}</div>
+          </div>
+          <div class="flex items-center gap-2 flex-shrink-0">
+            <div class="text-sm font-semibold ${tx.type==='income'?'text-emerald-400':'text-red-400'}">
+              ${tx.type==='income'?'+':'-'}${fmt(tx.amount)}
+            </div>
+            <button onclick="txAskDelete('${tx.id}')" class="text-gray-700 hover:text-red-400 transition-colors text-base leading-none" style="background:none;border:none;cursor:pointer;padding:2px 4px">×</button>
+          </div>
+        </div>`;
+    }).join('');
+    return `
+      <div class="mb-4">
+        <div class="section-label mb-2">${fmtDate(date)}</div>
+        ${rows}
+      </div>`;
+  }).join('');
+
+  const filterLabels = {month:'This Month', all:'All Time', expense:'Expenses', income:'Income'};
+  const filters = ['month','all','expense','income'];
+
+  // Add transaction modal
+  const activeCatOptions = (type) => state.categories.filter(c=>c.type===type&&c.active)
+    .map(c=>`<option value="${c.id}">${c.icon} ${c.name}</option>`).join('');
+
+  const modal = txUI.showModal ? `
+    <div class="fixed inset-0 z-50 flex items-end sm:items-center justify-center" style="background:rgba(0,0,0,0.8)" onclick="txCloseModal()">
+      <div class="w-full sm:w-96 rounded-t-3xl sm:rounded-2xl p-6" style="background:#1d2027;border:1px solid #374151;max-height:92vh;overflow-y:auto" onclick="event.stopPropagation()">
+        <div class="flex items-center justify-between mb-5">
+          <div class="text-lg font-bold">Add Transaction</div>
+          <button onclick="txCloseModal()" style="background:none;border:none;color:#6b7280;cursor:pointer;font-size:20px;line-height:1">×</button>
+        </div>
+
+        <div class="field-label">TYPE</div>
+        <div class="inline-flex p-1 rounded-xl mb-4 gap-1 w-full" style="background:#0f1116;border:1px solid #1f2937">
+          <button onclick="document.getElementById('tx-type').value='expense';txUpdateCatDropdown()" id="btn-expense"
+            class="flex-1 rounded-lg py-2 text-sm font-medium" style="background:#1d2027;color:#f87171;border:1px solid #374151">💸 Expense</button>
+          <button onclick="document.getElementById('tx-type').value='income';txUpdateCatDropdown()" id="btn-income"
+            class="flex-1 rounded-lg py-2 text-sm font-medium" style="background:transparent;color:#6b7280;border:1px solid transparent">💰 Income</button>
+          <button onclick="document.getElementById('tx-type').value='transfer';txUpdateCatDropdown()" id="btn-transfer"
+            class="flex-1 rounded-lg py-2 text-sm font-medium" style="background:transparent;color:#6b7280;border:1px solid transparent">🔄 Transfer</button>
+        </div>
+        <input type="hidden" id="tx-type" value="expense">
+
+        <div class="grid grid-cols-2 gap-3 mb-3">
+          <div>
+            <div class="field-label">DATE *</div>
+            <input id="tx-date" type="date" value="${todayISO}" class="field-input">
+          </div>
+          <div>
+            <div class="field-label">AMOUNT *</div>
+            <input id="tx-amount" type="number" step="0.01" min="0" placeholder="0.00" class="field-input">
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <div class="field-label">DESCRIPTION *</div>
+          <input id="tx-desc" type="text" placeholder="e.g. Jollibee lunch" class="field-input">
+        </div>
+
+        <div class="mb-3">
+          <div class="field-label">CATEGORY *</div>
+          <select id="tx-cat" class="field-select" onchange="txUpdateSubDropdown()">
+            <option value="">— Select category —</option>
+            ${activeCatOptions('expense')}
+          </select>
+        </div>
+
+        <div class="mb-3">
+          <div class="field-label">SUBCATEGORY</div>
+          <select id="tx-subcat" class="field-select">
+            <option value="">— Select subcategory (optional) —</option>
+          </select>
+        </div>
+
+        <div class="mb-3">
+          <div class="field-label">ACCOUNT *</div>
+          <select id="tx-account" class="field-select">
+            <option value="">— Select account —</option>
+            ${state.accounts.map(a=>`<option value="${a.id}">${a.name}</option>`).join('')}
+          </select>
+        </div>
+
+        <div class="mb-5">
+          <div class="field-label">NOTES (optional)</div>
+          <input id="tx-notes" type="text" placeholder="Optional notes..." class="field-input">
+        </div>
+
+        <div id="tx-error" class="text-red-400 text-xs mb-3"></div>
+
+        <div class="flex gap-3">
+          <button onclick="txSave()" class="flex-1 rounded-xl py-3 font-semibold text-white text-sm" style="background:#6366f1;border:none;cursor:pointer">Save Transaction</button>
+          <button onclick="txCloseModal()" class="flex-1 rounded-xl py-3 text-sm" style="background:#0f1116;border:1px solid #374151;color:#9ca3af;cursor:pointer">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      (function(){
+        var btns = {expense:'btn-expense',income:'btn-income',transfer:'btn-transfer'};
+        var inp = document.getElementById('tx-type');
+        ['expense','income','transfer'].forEach(function(t){
+          document.getElementById('btn-'+t).onclick = function(){
+            inp.value = t;
+            Object.keys(btns).forEach(function(k){
+              var btn = document.getElementById('btn-'+k);
+              if(k===t){ btn.style.background='#1d2027'; btn.style.borderColor='#374151';
+                btn.style.color = k==='income'?'#34d399':k==='expense'?'#f87171':'#818cf8';
+              } else { btn.style.background='transparent'; btn.style.borderColor='transparent'; btn.style.color='#6b7280'; }
+            });
+            txUpdateCatDropdown();
+          };
+        });
+      })();
+    <\/script>` : '';
+
+  return `
+    ${renderNav()}
+    <div class="flex items-start justify-between mb-5">
+      <div>
+        <div class="text-2xl font-bold mb-1">Transactions</div>
+        <div class="section-label">${state.transactions.length} TOTAL · ${list.length} IN VIEW</div>
+      </div>
+      <button onclick="txOpenModal()" class="rounded-xl px-4 py-2.5 text-sm font-semibold text-white flex-shrink-0"
+        style="background:#6366f1;border:none;cursor:pointer">+ Add</button>
+    </div>
+
+    <!-- Summary bar -->
+    <div class="grid grid-cols-3 gap-3 mb-5">
+      <div class="rounded-xl p-3 text-center" style="background:#1d2027">
+        <div class="section-label mb-1">INCOME</div>
+        <div class="font-bold text-emerald-400 text-sm">${fmt(totalIncome)}</div>
+      </div>
+      <div class="rounded-xl p-3 text-center" style="background:#1d2027">
+        <div class="section-label mb-1">EXPENSES</div>
+        <div class="font-bold text-red-400 text-sm">${fmt(totalExpense)}</div>
+      </div>
+      <div class="rounded-xl p-3 text-center" style="background:#1d2027">
+        <div class="section-label mb-1">NET</div>
+        <div class="font-bold text-sm ${net>=0?'text-emerald-400':'text-red-400'}">${net>=0?'+':''}${fmt(net)}</div>
+      </div>
+    </div>
+
+    <!-- Filter tabs -->
+    <div class="flex gap-2 mb-5 flex-wrap">
+      ${filters.map(f=>`
+        <button onclick="txSetFilter('${f}')" class="text-xs px-3 py-1.5 rounded-full transition-all"
+          style="${txUI.filter===f?'background:#6366f1;color:#fff;border:1px solid #6366f1':'background:#1d2027;color:#9ca3af;border:1px solid #374151'}">
+          ${filterLabels[f]}
+        </button>`).join('')}
+    </div>
+
+    <!-- Transaction list -->
+    <div class="rounded-2xl p-4" style="background:#1d2027">
+      ${list.length === 0
+        ? `<div class="text-center py-12" style="color:#6b7280">
+            <div class="text-4xl mb-3">💸</div>
+            <div class="font-semibold mb-1" style="color:#9ca3af">No transactions</div>
+            <div class="text-sm">Click "+ Add" to log your first one.</div>
+          </div>`
+        : rowsHTML}
+    </div>
+    ${modal}`;
+}
+
+// ═══════════════════════════════════════════════════════
+// RENDER CATEGORIES
+// ═══════════════════════════════════════════════════════
+function renderCategories() {
+  const all=state.categories, filtered=all.filter(c=>c.type===catUI.tab);
+  const expCount=all.filter(c=>c.type==='expense').length, incCount=all.filter(c=>c.type==='income').length;
+  const activeCount=filtered.filter(c=>c.active).length;
+  const cards=filtered.map(cat=>{
+    const isExpanded=catUI.expanded===cat.id, activeSubs=cat.subs.filter(s=>s.active).length;
+    const toggleBg=cat.active?'#10b981':'#374151', knobLeft=cat.active?'19px':'3px';
+    const subsSection=isExpanded?`
+      <div style="background:#0f1116;border-top:1px solid #1f2937" class="px-4 pt-3 pb-4 rounded-b-2xl">
+        <div class="section-label mb-2.5">SUBCATEGORIES — double-click to rename</div>
+        <div class="flex flex-wrap gap-1.5 mb-3">
+          ${cat.subs.map(s=>`<span class="chip${s.active?'':' off'}">
+            <span id="sub-name-${s.id}" ondblclick="catStartRenameSub('${cat.id}','${s.id}')" style="cursor:text">${s.name}</span>
+            <button class="chip-btn" onclick="catToggleSub('${cat.id}','${s.id}')">${s.active?'●':'○'}</button>
+            <button class="chip-btn" onclick="catDeleteSub('${cat.id}','${s.id}')">×</button>
+          </span>`).join('')}
+        </div>
+        <div class="flex gap-2 items-center">
+          <input id="new-sub-${cat.id}" class="add-sub-input" placeholder="New subcategory…" onkeydown="if(event.key==='Enter')catAddSub('${cat.id}')">
+          <button onclick="catAddSub('${cat.id}')" class="text-xs px-3 py-1.5 rounded-full text-white font-semibold" style="background:#6366f1;border:none;cursor:pointer">Add</button>
+        </div>
+      </div>`:'' ;
+    return `<div class="rounded-2xl overflow-hidden" style="background:#1d2027;${cat.active?'':'opacity:0.5'}">
+      <div class="flex items-center gap-3 p-4">
+        <div id="cat-icon-${cat.id}" onclick="catStartRenameIcon('${cat.id}')" class="flex-shrink-0 flex items-center justify-center rounded-xl text-xl cursor-pointer" style="width:44px;height:44px;background:#0f1116;border:1px solid #1f2937">${cat.icon}</div>
+        <div class="flex-1 min-w-0">
+          <div id="cat-name-${cat.id}" ondblclick="catStartRenameCategory('${cat.id}')" class="font-semibold text-sm truncate" style="color:#e5e7eb;cursor:text">${cat.name}</div>
+          <div class="text-xs mt-0.5" style="color:#6b7280">${activeSubs}/${cat.subs.length} subcategories</div>
+        </div>
+        <div class="flex items-center gap-3 flex-shrink-0">
+          <div class="cat-toggle" onclick="catToggle('${cat.id}')" style="width:38px;height:22px;background:${toggleBg}"><div class="cat-toggle-knob" style="left:${knobLeft}"></div></div>
+          <button onclick="catToggleExpand('${cat.id}')" style="background:none;border:none;cursor:pointer;color:#9ca3af;font-size:20px;line-height:1;padding:0;transform:rotate(${isExpanded?'180':'0'}deg);transition:transform 0.2s">⌄</button>
+        </div>
+      </div>${subsSection}</div>`;
+  }).join('');
+  const modal=catUI.showModal?`
+    <div class="fixed inset-0 z-50 flex items-center justify-center" style="background:rgba(0,0,0,0.8)" onclick="catCloseModal()">
+      <div class="rounded-2xl p-7 w-80" style="background:#1d2027;border:1px solid #374151" onclick="event.stopPropagation()">
+        <div class="text-lg font-bold mb-1">New ${catUI.tab==='expense'?'Expense':'Income'} Category</div>
+        <div class="text-sm mb-5" style="color:#6b7280">Fill in the details below.</div>
+        <div class="section-label mb-1.5">EMOJI ICON</div>
+        <input id="modal-icon" placeholder="🗂️" class="w-full rounded-xl p-3 mb-4 text-2xl" style="background:#0f1116;border:1px solid #374151;color:#e5e7eb;outline:none;font-family:inherit">
+        <div class="section-label mb-1.5">CATEGORY NAME</div>
+        <input id="modal-name" placeholder="e.g. Education" onkeydown="if(event.key==='Enter')catAddFromModal();if(event.key==='Escape')catCloseModal()" class="w-full rounded-xl p-3 mb-6" style="background:#0f1116;border:1px solid #374151;color:#e5e7eb;outline:none;font-size:15px;font-family:inherit">
+        <div class="flex gap-3">
+          <button onclick="catAddFromModal()" class="flex-1 rounded-xl py-3 text-sm font-semibold text-white" style="background:#6366f1;border:none;cursor:pointer">Add Category</button>
+          <button onclick="catCloseModal()" class="flex-1 rounded-xl py-3 text-sm" style="background:#0f1116;border:1px solid #374151;color:#9ca3af;cursor:pointer">Cancel</button>
+        </div>
+      </div>
+    </div>`:'' ;
+  return `${renderNav()}
+    <div class="flex items-start justify-between mb-5">
+      <div><div class="text-2xl font-bold mb-1">Categories</div><div class="section-label">${expCount} EXPENSE &middot; ${incCount} INCOME &middot; ${activeCount} ACTIVE IN VIEW</div></div>
+      <button onclick="catOpenModal()" class="rounded-xl px-4 py-2.5 text-sm font-semibold text-white flex-shrink-0" style="background:#6366f1;border:none;cursor:pointer">+ Add Category</button>
+    </div>
+    <div class="flex p-1 rounded-xl mb-5 gap-1" style="background:#0f1116;border:1px solid #1f2937">
+      <button onclick="catSetTab('expense')" class="rounded-lg px-5 py-2 text-sm font-medium" style="${catUI.tab==='expense'?'background:#1d2027;color:#e5e7eb;border:1px solid #374151':'background:transparent;color:#6b7280;border:1px solid transparent'}">💸 Expense (${expCount})</button>
+      <button onclick="catSetTab('income')" class="rounded-lg px-5 py-2 text-sm font-medium" style="${catUI.tab==='income'?'background:#1d2027;color:#e5e7eb;border:1px solid #374151':'background:transparent;color:#6b7280;border:1px solid transparent'}">💰 Income (${incCount})</button>
+    </div>
+    <div class="text-xs mb-4 flex flex-wrap gap-x-4 gap-y-1" style="color:#4b5563"><span>💡 Double-click name to rename &nbsp;·&nbsp; Click emoji to change &nbsp;·&nbsp; Toggle to activate/deactivate</span></div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">${filtered.length===0?`<div class="col-span-2 text-center py-16" style="color:#6b7280"><div class="text-5xl mb-3">🗂️</div><div class="font-semibold mb-1" style="color:#9ca3af">No categories</div></div>`:cards}</div>
+    ${modal}`;
+}
+
+// ═══════════════════════════════════════════════════════
+// RENDER PLACEHOLDER
+// ═══════════════════════════════════════════════════════
+function renderPlaceholder(label, icon, note) {
+  return `${renderNav()}
+    <div class="flex flex-col items-center justify-center py-24 text-center">
+      <div class="text-5xl mb-4">${icon}</div>
+      <div class="text-xl font-bold mb-2">${label}</div>
+      <div class="text-sm max-w-xs" style="color:#6b7280">${note}</div>
+      <div class="mt-5 text-xs px-4 py-2 rounded-full" style="color:#4b5563;border:1px solid #1f2937">Coming soon</div>
+    </div>`;
+}
+
+// ═══════════════════════════════════════════════════════
+// RENDER DASHBOARD
+// ═══════════════════════════════════════════════════════
+function renderDashboard() {
+  const nw=netWorth(), assets=totalAssets(), liab=totalLiab();
+  const m=getMonthlyData();
+  const net=m.income-m.expenses;
+  const incomeW=Math.min((m.income/Math.max(m.income,m.expenses))*100,100);
+  const expW=Math.min((m.expenses/Math.max(m.income,m.expenses))*100,100);
+  const dailyBurn=m.avgMonthlyExpenses/30, runway=Math.floor(assets/dailyBurn);
+  const savingsRate=m.income>0?((net/m.income)*100).toFixed(1):0;
+  const maxCat=Math.max(...m.categories.map(c=>c.amount),1);
+  const forecastItems={
+    income: state.recurring.filter(r=>r.type==='income' &&daysUntil(r.dueDay)<=state.forecastDays),
+    expense:state.recurring.filter(r=>r.type==='expense'&&daysUntil(r.dueDay)<=state.forecastDays),
+  };
+  const forecastIncome=forecastItems.income.reduce((s,r)=>s+r.amount,0);
+  const forecastExpense=forecastItems.expense.reduce((s,r)=>s+r.amount,0);
+  const available=assets+forecastIncome-forecastExpense;
+
+  return `${renderNav()}
+    <div class="rounded-2xl p-6 mb-6" style="background:linear-gradient(135deg,#4338ca 0%,#6366f1 100%)">
+      <div class="text-sm opacity-75 mb-1">Net worth</div>
+      <div class="text-5xl font-bold tracking-tight mb-5">${fmt2(nw)}</div>
+      <div class="flex gap-10">
+        <div><div class="text-xs opacity-60 mb-0.5">Assets</div><div class="text-lg font-semibold">${fmt2(assets)}</div></div>
+        <div><div class="text-xs opacity-60 mb-0.5">Liabilities</div><div class="text-lg font-semibold">${fmt2(liab)}</div></div>
+      </div>
+    </div>
+    <div class="flex items-center justify-between mb-3"><div class="section-label">DEBIT ACCOUNTS</div><div class="text-xs text-emerald-400 font-medium">${fmt2(assets)}</div></div>
+    <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-3">
+      ${state.accounts.map(a=>`<div class="bg-[#1d2027] rounded-xl p-4"><div class="text-xs text-gray-400 mb-2">${a.name}</div><div class="text-lg font-semibold">${editable(a.balance,`accounts.${a.id}.balance`,fmt)}</div></div>`).join('')}
+    </div>
+    <div class="flex items-center justify-between mb-3 mt-6"><div class="section-label">CREDIT CARDS</div><div class="text-xs text-red-400 font-medium">OWED ${fmt2(liab)}</div></div>
+    <div class="space-y-3 mb-7">
+      ${state.creditCards.map(c=>{
+        const avail=c.limit-c.outstanding, pct=c.limit>0?Math.min((c.outstanding/c.limit)*100,100):0;
+        return `<div class="bg-[#1d2027] rounded-xl p-4">
+          <div class="flex justify-between items-start mb-3">
+            <div><div class="font-medium">${c.name}</div><div class="text-xs text-gray-500 mt-0.5">Due ${c.dueDay}${sfx(c.dueDay)} · ${daysUntil(c.dueDay)} days away</div></div>
+            <div class="text-right"><div class="text-red-400 font-semibold">${editable(c.outstanding,`creditCards.${c.id}.outstanding`,fmt2)}</div><div class="text-xs text-gray-500">avl. ${fmt2(avail)}</div></div>
+          </div>
+          <div class="bg-[#0f1116] rounded-full overflow-hidden" style="height:3px"><div style="width:${pct}%;height:3px;background:#ef4444;border-radius:2px"></div></div>
+        </div>`;}).join('')}
+    </div>
+    <div class="bg-[#1d2027] rounded-2xl p-5 mb-4">
+      <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center gap-2"><span>📊</span><span class="font-semibold">${m.label}</span></div>
+        <div class="text-xs px-2.5 py-1 rounded-full font-semibold ${net>=0?'bg-emerald-900/40 text-emerald-400':'bg-red-900/40 text-red-400'}">${net>=0?'+':''}${fmt(net)}</div>
+      </div>
+      <div class="space-y-3">
+        <div>
+          <div class="flex justify-between text-sm mb-1.5"><span class="text-gray-400">Income</span><span class="text-emerald-400 font-medium">${fmt2(m.income)}</span></div>
+          <div class="bg-[#0f1116] rounded-full overflow-hidden" style="height:6px"><div style="width:${incomeW}%;height:6px;background:linear-gradient(90deg,#10b981,#34d399);border-radius:3px"></div></div>
+        </div>
+        <div>
+          <div class="flex justify-between text-sm mb-1.5"><span class="text-gray-400">Expenses</span><span class="text-red-400 font-medium">${fmt2(m.expenses)}</span></div>
+          <div class="bg-[#0f1116] rounded-full overflow-hidden" style="height:6px"><div style="width:${expW}%;height:6px;background:linear-gradient(90deg,#ef4444,#f87171);border-radius:3px"></div></div>
+        </div>
+      </div>
+      <div class="flex gap-4 mt-4 pt-4 border-t border-gray-800">
+        <div class="flex-1 text-center"><div class="text-xs text-gray-500 mb-0.5">Net Income</div><div class="font-bold ${net>=0?'text-emerald-400':'text-red-400'}">${fmt(net)}</div></div>
+        <div class="flex-1 text-center border-l border-gray-800"><div class="text-xs text-gray-500 mb-0.5">Savings Rate</div><div class="font-bold ${savingsRate>=20?'text-emerald-400':'text-amber-400'}">${savingsRate}%</div></div>
+        <div class="flex-1 text-center border-l border-gray-800"><div class="text-xs text-gray-500 mb-0.5">vs Last Month</div><div class="font-bold text-gray-400">↑ 51%</div></div>
+      </div>
+    </div>
+    <div class="grid grid-cols-2 gap-3 mb-4">
+      <div class="bg-[#1d2027] rounded-2xl p-5">
+        <div class="text-xs text-gray-500 mb-1">🔥 Daily Burn Rate</div>
+        <div class="text-2xl font-bold">${fmt(dailyBurn)}</div>
+        <div class="text-xs text-gray-600 mt-1">per day</div>
+        <div class="mt-3 pt-3 border-t border-gray-800"><div class="text-xs text-gray-500">Avg monthly spend</div><div class="text-sm font-medium mt-0.5">${editable(m.avgMonthlyExpenses,'monthly.avgMonthlyExpenses',fmt)}</div></div>
+      </div>
+      <div class="bg-[#1d2027] rounded-2xl p-5">
+        <div class="text-xs text-gray-500 mb-1">⏱️ Cash Runway</div>
+        <div class="text-2xl font-bold ${runway<14?'text-red-400':runway<30?'text-amber-400':'text-emerald-400'}">${runway}</div>
+        <div class="text-xs text-gray-600 mt-1">days remaining</div>
+        <div class="mt-3 pt-3 border-t border-gray-800"><div class="text-xs ${runway<14?'text-red-400':runway<30?'text-amber-400':'text-gray-500'}">${runway<14?'⚠️ Income needed soon':runway<30?'Moderate cushion':'Good buffer'}</div></div>
+      </div>
+    </div>
+    <div class="bg-[#1d2027] rounded-2xl p-5 mb-4">
+      <div class="flex items-center gap-2 mb-4"><span>🏆</span><span class="font-semibold">Top Spending — ${m.label}</span></div>
+      <div class="space-y-3">
+        ${m.categories.map((c,i)=>{
+          const pct=(c.amount/maxCat)*100;
+          return `<div>
+            <div class="flex justify-between items-center mb-1.5">
+              <div class="flex items-center gap-2 text-sm"><span class="text-base">${c.icon}</span><span>${c.name}</span><span class="text-xs text-gray-600">#${i+1}</span></div>
+              <span class="text-sm font-medium">${fmt(c.amount)}</span>
+            </div>
+            <div class="bg-[#0f1116] rounded-full overflow-hidden" style="height:5px"><div style="width:${pct}%;height:5px;background:${c.color};border-radius:3px;opacity:0.85"></div></div>
+          </div>`;}).join('')}
+      </div>
+    </div>
+    <div class="bg-[#1d2027] rounded-2xl p-5 mb-4">
+      <div class="flex items-center gap-2 mb-4"><span>🪙</span><span class="font-semibold">Spending Forecast</span></div>
+      <div class="flex gap-2 mb-5 flex-wrap">
+        ${[7,14,21,30].map(d=>`<button class="tab-btn text-xs px-3 py-1.5 rounded-full ${state.forecastDays===d?'active':'bg-[#2a2d35] text-gray-300'}" onclick="setForecast(${d})">${d} days</button>`).join('')}
+      </div>
+      <div class="flex justify-between py-2.5 border-b border-gray-800"><span class="text-sm">Current funds</span><span class="font-semibold">${fmt2(assets)}</span></div>
+      <div class="text-xs text-gray-600 font-semibold tracking-wider mt-4 mb-2">SCHEDULED INCOME</div>
+      ${forecastItems.income.length===0?`<div class="text-xs text-gray-700 py-1.5">None in this window</div>`:forecastItems.income.map(r=>`<div class="flex justify-between items-center py-1.5"><div class="text-sm flex items-center gap-2"><span>${r.icon}</span>${r.name}</div><div class="text-sm ${r.amount===0?'text-gray-700':'text-emerald-400'}">${r.amount===0?'—':'+ '+fmt(r.amount)}</div></div>`).join('')}
+      <div class="text-xs text-gray-600 font-semibold tracking-wider mt-4 mb-2">SCHEDULED EXPENSES</div>
+      ${forecastItems.expense.length===0?`<div class="text-xs text-gray-700 py-1.5">None in this window</div>`:forecastItems.expense.map(r=>`<div class="flex justify-between items-center py-1.5"><div class="text-sm flex items-center gap-2"><span>${r.icon}</span>${r.name}</div><div class="text-sm text-red-400">− ${fmt(r.amount)}</div></div>`).join('')}
+      <div class="flex justify-between items-center pt-4 mt-3 border-t border-gray-800"><span class="font-semibold">Available to spend</span><span class="text-lg font-bold ${available>=0?'text-emerald-400':'text-red-400'}">${fmt2(available)}</span></div>
+    </div>
+    <div class="bg-[#1d2027] rounded-2xl p-5">
+      <div class="flex items-center gap-2 mb-4"><span>🎯</span><span class="font-semibold">Financial Goals</span></div>
+      ${state.goals.map(g=>{
+        const remaining=g.target-g.saved, months=monthsBetween(g.targetDate), monthly=months>0?remaining/months:0, daily=monthly/30;
+        const pct=Math.min((g.saved/g.target)*100,100);
+        const dateLabel=new Date(g.targetDate).toLocaleDateString('en-US',{month:'short',year:'numeric'});
+        return `<div class="rounded-xl p-4" style="background:#14171c">
+          <div class="flex justify-between items-start mb-3">
+            <div><div class="font-semibold">${g.icon} ${g.name}</div><div class="text-xs text-gray-500 mt-0.5">Target: ${dateLabel} · ${months} months away</div></div>
+            <div class="text-xs px-2 py-1 rounded-full bg-amber-900/30 text-amber-300">${g.status}</div>
+          </div>
+          <div class="flex justify-between text-sm mb-1.5"><span class="text-gray-500">Saved so far</span><span>${editable(g.saved,`goals.${g.id}.saved`,fmt)} <span class="text-gray-500">of ${fmt(g.target)}</span></span></div>
+          <div class="bg-[#0f1116] rounded-full overflow-hidden mb-4" style="height:6px"><div style="width:${pct}%;height:6px;background:linear-gradient(90deg,#f59e0b,#fbbf24);border-radius:3px"></div></div>
+          <div class="grid grid-cols-3 gap-2">
+            <div class="bg-[#1d2027] rounded-lg p-3"><div class="text-xs text-gray-500">Remaining</div><div class="font-semibold mt-0.5 text-sm">${fmt(remaining)}</div></div>
+            <div class="bg-[#1d2027] rounded-lg p-3"><div class="text-xs text-gray-500">Monthly needed</div><div class="font-semibold mt-0.5 text-sm">${fmt(monthly)}</div></div>
+            <div class="bg-[#1d2027] rounded-lg p-3"><div class="text-xs text-gray-500">Daily needed</div><div class="font-semibold mt-0.5 text-sm">${fmt(daily)}</div></div>
+          </div>
+        </div>`;}).join('')}
+      <button class="w-full text-sm text-gray-600 mt-3 py-3 px-4 border border-dashed border-gray-800 rounded-xl hover:border-gray-600 hover:text-gray-400 transition-colors">+ Add another goal</button>
+    </div>
+    <div class="text-center text-xs text-gray-700 mt-8 pb-4">Click any number to edit · Changes saved automatically · <span class="cursor-pointer hover:text-indigo-400" onclick="setView('transactions')">View all transactions →</span></div>`;
+}
+
+// ═══════════════════════════════════════════════════════
+// MAIN RENDER
+// ═══════════════════════════════════════════════════════
+function render() {
+  let html;
+  if      (currentView==='transactions') html=renderTransactions();
+  else if (currentView==='categories')   html=renderCategories();
+  else if (currentView==='accounts')     html=renderPlaceholder('Accounts','🏦','Manage bank accounts, e-wallets, and credit cards. Coming soon.');
+  else if (currentView==='goals')        html=renderPlaceholder('Goals','🎯','Track savings goals with visual progress. Coming soon.');
+  else if (currentView==='recurring')    html=renderPlaceholder('Recurring','🔁','Manage recurring income and expenses. Coming soon.');
+  else                                   html=renderDashboard();
+  document.getElementById('app').innerHTML=html;
+  attachEdits();
+}
+
+render();
+</script>
+</body>
+</html>
