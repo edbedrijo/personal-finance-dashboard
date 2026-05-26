@@ -179,16 +179,16 @@ const defaultTransactions = [
 // ═══════════════════════════════════════════════════════
 const defaultState = {
   accounts: [
-    { id:'unionbank',    name:'Unionbank',     balance:33169.02 },
-    { id:'securitybank', name:'Security Bank', balance:35693.34 },
-    { id:'maribank',     name:'Maribank',      balance:2617.00  },
-    { id:'gcash',        name:'GCash',         balance:1478.03  },
-    { id:'maya',         name:'Maya',          balance:547.56   },
-    { id:'cash',         name:'Cash on hand',  balance:1000.00  },
+    { id:'unionbank',    name:'Unionbank',     balance:33169.02, type:'bank',    icon:'🏦' },
+    { id:'securitybank', name:'Security Bank', balance:35693.34, type:'bank',    icon:'🏦' },
+    { id:'maribank',     name:'Maribank',      balance:2617.00,  type:'bank',    icon:'🏦' },
+    { id:'gcash',        name:'GCash',         balance:1478.03,  type:'ewallet', icon:'📱' },
+    { id:'maya',         name:'Maya',          balance:547.56,   type:'ewallet', icon:'📱' },
+    { id:'cash',         name:'Cash on hand',  balance:1000.00,  type:'cash',    icon:'💵' },
   ],
   creditCards: [
-    { id:'unionbankCC', name:'Unionbank CC',     outstanding:53206.58, limit:470000, dueDay:25 },
-    { id:'securityCC',  name:'Security Bank CC', outstanding:17.00,    limit:50000,  dueDay:25 },
+    { id:'unionbankCC', name:'Unionbank CC',     outstanding:53206.58, limit:470000, dueDay:25, icon:'💳' },
+    { id:'securityCC',  name:'Security Bank CC', outstanding:17.00,    limit:50000,  dueDay:25, icon:'💳' },
   ],
   monthly: {
     label: currentMonthLabel,
@@ -204,16 +204,16 @@ const defaultState = {
     ]
   },
   recurring: [
-    { id:'r1', name:'Rent',                 amount:22000, dueDay:1,  type:'expense', icon:'🏠', variable:false },
-    { id:'r2', name:'Starlink',             amount:2500,  dueDay:5,  type:'expense', icon:'🌐', variable:false },
-    { id:'r3', name:'Parents support',      amount:5000,  dueDay:10, type:'expense', icon:'👨‍👩‍👧', variable:false },
-    { id:'r4', name:'Ate Annie salary',     amount:6000,  dueDay:15, type:'expense', icon:'👵', variable:false },
-    { id:'r5', name:'Unionbank CC bill',    amount:13692, dueDay:25, type:'expense', icon:'💳', variable:true  },
-    { id:'r6', name:'Upwork payout',        amount:0,     dueDay:7,  type:'income',  icon:'💼', variable:true  },
-    { id:'r7', name:'Brickell Ads revenue', amount:0,     dueDay:1,  type:'income',  icon:'📈', variable:true  },
+    { id:'r1', name:'Rent',                 icon:'🏠', type:'expense', amount:22000, frequency:'monthly', categoryId:'', subcategoryId:'', accountId:'unionbank', nextDue:'2026-06-01', active:true, lastPosted:null },
+    { id:'r2', name:'Starlink',             icon:'🌐', type:'expense', amount:2500,  frequency:'monthly', categoryId:'', subcategoryId:'', accountId:'unionbank', nextDue:'2026-06-05', active:true, lastPosted:null },
+    { id:'r3', name:'Parents Support',      icon:'👨‍👩‍👧', type:'expense', amount:5000, frequency:'monthly', categoryId:'', subcategoryId:'', accountId:'unionbank', nextDue:'2026-06-10', active:true, lastPosted:null },
+    { id:'r4', name:'Ate Annie Salary',     icon:'👵', type:'expense', amount:6000,  frequency:'monthly', categoryId:'', subcategoryId:'', accountId:'cash',      nextDue:'2026-06-15', active:true, lastPosted:null },
+    { id:'r5', name:'Unionbank CC Bill',    icon:'💳', type:'expense', amount:13692, frequency:'monthly', categoryId:'', subcategoryId:'', accountId:'unionbank', nextDue:'2026-06-25', active:true, lastPosted:null },
+    { id:'r6', name:'Upwork Payout',        icon:'💼', type:'income',  amount:0,     frequency:'monthly', categoryId:'', subcategoryId:'', accountId:'unionbank', nextDue:'2026-06-07', active:true, lastPosted:null },
+    { id:'r7', name:'Brickell Ads Revenue', icon:'📈', type:'income',  amount:0,     frequency:'monthly', categoryId:'', subcategoryId:'', accountId:'unionbank', nextDue:'2026-06-01', active:true, lastPosted:null },
   ],
   goals: [
-    { id:'g1', name:'Car downpayment', icon:'🚗', target:500000, saved:50000, targetDate:'2026-12-31', status:'In progress' }
+    { id:'g1', name:'Car downpayment', icon:'🚗', target:500000, targetDate:'2026-12-31', linkedCategoryId:'c13', linkedSubcategoryId:'s120', deposits:[{id:'d_init',date:'2026-01-01',amount:50000,note:'Initial savings'}] }
   ],
   forecastDays: 7,
   categories: defaultCategories,
@@ -230,6 +230,38 @@ let state = (() => {
       const p = JSON.parse(s);
       if (!p.categories)    p.categories    = JSON.parse(JSON.stringify(defaultCategories));
       if (!p.transactions)  p.transactions  = JSON.parse(JSON.stringify(defaultTransactions));
+      // Migrate accounts — add type + icon if missing
+      if (p.accounts) p.accounts.forEach(a => {
+        if (!a.type) a.type = ['gcash','maya'].includes(a.id) ? 'ewallet' : a.id==='cash' ? 'cash' : 'bank';
+        if (!a.icon) a.icon = a.type==='bank' ? '🏦' : a.type==='ewallet' ? '📱' : '💵';
+      });
+      if (p.creditCards) p.creditCards.forEach(c => { if (!c.icon) c.icon = '💳'; });
+      // Migrate recurring — old format used dueDay (number), new uses nextDue (ISO date)
+      if (p.recurring) p.recurring.forEach(r => {
+        if (r.dueDay !== undefined && !r.frequency) {
+          r.frequency = 'monthly';
+          r.active = true;
+          const dd = String(r.dueDay).padStart(2,'0');
+          const thisM = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${dd}`;
+          const nx = new Date(now.getFullYear(), now.getMonth()+1, r.dueDay);
+          const nextM = nx.toISOString().split('T')[0];
+          r.nextDue = (todayISO <= thisM) ? thisM : nextM;
+          r.categoryId = r.categoryId||''; r.subcategoryId = r.subcategoryId||'';
+          r.accountId = r.accountId||''; r.lastPosted = null;
+          delete r.dueDay; delete r.variable;
+        }
+        if (r.active===undefined) r.active=true;
+      });
+      // Migrate goals — move saved → deposit, add linkedCategory fields
+      if (p.goals) p.goals.forEach(g => {
+        if (!g.deposits) {
+          g.deposits = (g.saved>0) ? [{id:'d_init_'+g.id, date:todayISO, amount:g.saved||0, note:'Initial balance'}] : [];
+          delete g.saved;
+        }
+        if (g.linkedCategoryId===undefined) g.linkedCategoryId='';
+        if (g.linkedSubcategoryId===undefined) g.linkedSubcategoryId='';
+        delete g.status;
+      });
       return p;
     }
   } catch(e) {}
@@ -244,6 +276,11 @@ const save = () => { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(stat
 let currentView = 'dashboard';
 let catUI  = { tab:'expense', expanded:null, showModal:false };
 let txUI   = { filter:'month', showModal:false, deleteId:null };
+let acctUI = { showAddAcct:false, addType:'bank', editAcctId:null, deleteAcctId:null, showAddCC:false, editCCId:null, deleteCCId:null };
+let goalUI = { showAddGoal:false, editGoalId:null, deleteGoalId:null, depositGoalId:null, expandedGoalId:null, deleteDepositKey:null };
+let recUI  = { showAddRec:false, editRecId:null, deleteRecId:null };
+let recAutoPostedCount = 0;
+let recurringChecked   = false;
 
 // ═══════════════════════════════════════════════════════
 // UTILITIES
@@ -272,6 +309,62 @@ function fmtDate(iso) {
 function fmtDateShort(iso) {
   const d = new Date(iso + 'T00:00:00');
   return d.toLocaleDateString('en-PH', { month:'short', day:'numeric' });
+}
+
+function advanceDue(dateStr, freq) {
+  const d = new Date(dateStr + 'T00:00:00');
+  switch(freq) {
+    case 'daily':     d.setDate(d.getDate()+1); break;
+    case 'weekly':    d.setDate(d.getDate()+7); break;
+    case 'biweekly':  d.setDate(d.getDate()+14); break;
+    case 'monthly':   d.setMonth(d.getMonth()+1); break;
+    case 'quarterly': d.setMonth(d.getMonth()+3); break;
+    case 'yearly':    d.setFullYear(d.getFullYear()+1); break;
+  }
+  return d.toISOString().split('T')[0];
+}
+
+function checkAndPostRecurring() {
+  if (recurringChecked) return 0;
+  recurringChecked = true;
+  if (!state.recurring?.length) return 0;
+  let posted = 0;
+  state.recurring.forEach(r => {
+    if (!r.active || !r.nextDue) return;
+    let safety = 0;
+    while (r.nextDue <= todayISO && safety < 24) {
+      safety++;
+      state.transactions.push({
+        id: 'tx_auto_' + Date.now() + '_' + (Math.random()*99999|0),
+        date: r.nextDue,
+        type: r.type,
+        amount: r.amount,
+        description: r.name,
+        categoryId: r.categoryId||'',
+        subcategoryId: r.subcategoryId||'',
+        accountId: r.accountId||'',
+        notes: 'Auto-posted'
+      });
+      const acct = state.accounts.find(a=>a.id===r.accountId);
+      if (acct) acct.balance += (r.type==='income' ? r.amount : -r.amount);
+      r.lastPosted = r.nextDue;
+      r.nextDue = advanceDue(r.nextDue, r.frequency);
+      posted++;
+    }
+  });
+  if (posted > 0) { recAutoPostedCount = posted; save(); }
+  return posted;
+}
+
+
+  const manual = (g.deposits||[]).reduce((s,d)=>s+d.amount,0);
+  let auto = 0;
+  if (g.linkedCategoryId) {
+    auto = state.transactions
+      .filter(t=>t.categoryId===g.linkedCategoryId && (!g.linkedSubcategoryId||t.subcategoryId===g.linkedSubcategoryId))
+      .reduce((s,t)=>s+t.amount,0);
+  }
+  return { manual, auto, total:manual+auto };
 }
 
 // ── Dashboard data: auto-calculate from transactions if available ──
@@ -452,6 +545,182 @@ window.txCancelDelete = () => { txUI.deleteId=null; render(); };
 window.txConfirmDelete = () => {
   state.transactions = state.transactions.filter(t=>t.id!==txUI.deleteId);
   save(); txUI.deleteId=null; render();
+};
+
+// ═══════════════════════════════════════════════════════
+// ACCOUNT ACTIONS
+// ═══════════════════════════════════════════════════════
+window.acctOpenAdd     = (type='bank') => { acctUI.showAddAcct=true; acctUI.addType=type; acctUI.editAcctId=null; render(); setTimeout(()=>document.getElementById('acct-name')?.focus(),60); };
+window.acctCloseAdd    = () => { acctUI.showAddAcct=false; render(); };
+window.acctSetAddType  = t => { acctUI.addType=t; render(); setTimeout(()=>document.getElementById('acct-name')?.focus(),60); };
+window.acctOpenEdit    = id => { acctUI.editAcctId=id; acctUI.showAddAcct=false; acctUI.deleteAcctId=null; render(); setTimeout(()=>document.getElementById('edit-acct-name-'+id)?.focus(),60); };
+window.acctCancelEdit  = () => { acctUI.editAcctId=null; render(); };
+window.acctAskDelete   = id => { acctUI.deleteAcctId=id; acctUI.editAcctId=null; render(); };
+window.acctCancelDelete= () => { acctUI.deleteAcctId=null; render(); };
+window.acctUpdate = id => {
+  const a=state.accounts.find(x=>x.id===id); if(!a) return;
+  const name=document.getElementById('edit-acct-name-'+id)?.value.trim();
+  const bal=parseFloat(document.getElementById('edit-acct-bal-'+id)?.value);
+  const icon=document.getElementById('edit-acct-icon-'+id)?.value.trim();
+  if(name) a.name=name; if(!isNaN(bal)) a.balance=bal; if(icon) a.icon=icon;
+  save(); acctUI.editAcctId=null; render();
+};
+window.acctConfirmDelete = () => {
+  state.accounts=state.accounts.filter(a=>a.id!==acctUI.deleteAcctId);
+  save(); acctUI.deleteAcctId=null; render();
+};
+window.acctSave = () => {
+  const name=document.getElementById('acct-name')?.value.trim();
+  const bal=parseFloat(document.getElementById('acct-balance')?.value)||0;
+  const icon=document.getElementById('acct-icon')?.value.trim()||(acctUI.addType==='bank'?'🏦':acctUI.addType==='ewallet'?'📱':'💵');
+  if(!name){document.getElementById('acct-err').textContent='Name is required.';return;}
+  state.accounts.push({id:'acct_'+Date.now(),name,balance:bal,type:acctUI.addType,icon});
+  save(); acctUI.showAddAcct=false; render();
+};
+
+// ═══════════════════════════════════════════════════════
+// CREDIT CARD ACTIONS
+// ═══════════════════════════════════════════════════════
+window.ccOpenAdd    = () => { acctUI.showAddCC=true; acctUI.editCCId=null; render(); setTimeout(()=>document.getElementById('cc-name')?.focus(),60); };
+window.ccCloseAdd   = () => { acctUI.showAddCC=false; render(); };
+window.ccOpenEdit   = id => { acctUI.editCCId=id; acctUI.showAddCC=false; acctUI.deleteCCId=null; render(); setTimeout(()=>document.getElementById('edit-cc-name-'+id)?.focus(),60); };
+window.ccCancelEdit = () => { acctUI.editCCId=null; render(); };
+window.ccAskDelete  = id => { acctUI.deleteCCId=id; acctUI.editCCId=null; render(); };
+window.ccCancelDelete=() => { acctUI.deleteCCId=null; render(); };
+window.ccUpdate = id => {
+  const c=state.creditCards.find(x=>x.id===id); if(!c) return;
+  const name=document.getElementById('edit-cc-name-'+id)?.value.trim();
+  const owed=parseFloat(document.getElementById('edit-cc-owed-'+id)?.value);
+  const lim=parseFloat(document.getElementById('edit-cc-lim-'+id)?.value);
+  const due=parseInt(document.getElementById('edit-cc-due-'+id)?.value);
+  const icon=document.getElementById('edit-cc-icon-'+id)?.value.trim();
+  if(name) c.name=name; if(!isNaN(owed)) c.outstanding=owed;
+  if(!isNaN(lim)) c.limit=lim; if(!isNaN(due)&&due>=1&&due<=31) c.dueDay=due;
+  if(icon) c.icon=icon;
+  save(); acctUI.editCCId=null; render();
+};
+window.ccConfirmDelete = () => {
+  state.creditCards=state.creditCards.filter(c=>c.id!==acctUI.deleteCCId);
+  save(); acctUI.deleteCCId=null; render();
+};
+window.ccSave = () => {
+  const name=document.getElementById('cc-name')?.value.trim();
+  const owed=parseFloat(document.getElementById('cc-owed')?.value)||0;
+  const lim=parseFloat(document.getElementById('cc-lim')?.value)||0;
+  const due=parseInt(document.getElementById('cc-due')?.value)||25;
+  const icon=document.getElementById('cc-icon')?.value.trim()||'💳';
+  if(!name){document.getElementById('cc-err').textContent='Name is required.';return;}
+  state.creditCards.push({id:'cc_'+Date.now(),name,outstanding:owed,limit:lim,dueDay:due,icon});
+  save(); acctUI.showAddCC=false; render();
+};
+
+// ═══════════════════════════════════════════════════════
+// GOAL ACTIONS
+// ═══════════════════════════════════════════════════════
+window.goalOpenAdd    = () => { goalUI.showAddGoal=true; goalUI.editGoalId=null; render(); setTimeout(()=>document.getElementById('goal-name')?.focus(),60); };
+window.goalCloseAdd   = () => { goalUI.showAddGoal=false; render(); };
+window.goalOpenEdit   = id => { goalUI.editGoalId=id; goalUI.showAddGoal=false; goalUI.deleteGoalId=null; render(); };
+window.goalCancelEdit = () => { goalUI.editGoalId=null; render(); };
+window.goalAskDelete  = id => { goalUI.deleteGoalId=id; goalUI.editGoalId=null; goalUI.depositGoalId=null; render(); };
+window.goalCancelDelete=() => { goalUI.deleteGoalId=null; render(); };
+window.goalConfirmDelete=() => { state.goals=state.goals.filter(g=>g.id!==goalUI.deleteGoalId); save(); goalUI.deleteGoalId=null; render(); };
+window.goalToggleHistory=id => { goalUI.expandedGoalId=goalUI.expandedGoalId===id?null:id; goalUI.depositGoalId=null; render(); };
+window.goalOpenDeposit= id => { goalUI.depositGoalId=id; goalUI.expandedGoalId=null; render(); setTimeout(()=>document.getElementById('dep-amt-'+id)?.focus(),60); };
+window.goalCloseDeposit=() => { goalUI.depositGoalId=null; render(); };
+window.goalUpdateSub  = (catSel, subSel) => {
+  const catId=document.getElementById(catSel)?.value;
+  const el=document.getElementById(subSel); if(!el) return;
+  el.innerHTML='<option value="">— All subcategories —</option>';
+  const cat=state.categories.find(c=>c.id===catId);
+  if(cat) cat.subs.filter(s=>s.active).forEach(s=>{ el.innerHTML+=`<option value="${s.id}">${s.name}</option>`; });
+};
+window.goalSave = () => {
+  const name=document.getElementById('goal-name')?.value.trim();
+  const target=parseFloat(document.getElementById('goal-target')?.value);
+  const date=document.getElementById('goal-date')?.value;
+  const icon=document.getElementById('goal-icon')?.value.trim()||'🎯';
+  const catId=document.getElementById('goal-cat')?.value||'';
+  const subId=document.getElementById('goal-subcat')?.value||'';
+  if(!name||isNaN(target)||!date){document.getElementById('goal-err').textContent='Name, amount, and date are required.';return;}
+  state.goals.push({id:'g_'+Date.now(),name,icon,target,targetDate:date,linkedCategoryId:catId,linkedSubcategoryId:subId,deposits:[]});
+  save(); goalUI.showAddGoal=false; render();
+};
+window.goalUpdate = id => {
+  const g=state.goals.find(x=>x.id===id); if(!g) return;
+  const name=document.getElementById('edit-goal-name')?.value.trim();
+  const target=parseFloat(document.getElementById('edit-goal-target')?.value);
+  const date=document.getElementById('edit-goal-date')?.value;
+  const icon=document.getElementById('edit-goal-icon')?.value.trim();
+  if(name) g.name=name; if(!isNaN(target)) g.target=target; if(date) g.targetDate=date; if(icon) g.icon=icon;
+  g.linkedCategoryId=document.getElementById('edit-goal-cat')?.value||'';
+  g.linkedSubcategoryId=document.getElementById('edit-goal-subcat')?.value||'';
+  save(); goalUI.editGoalId=null; render();
+};
+window.goalAddDeposit = id => {
+  const g=state.goals.find(x=>x.id===id); if(!g) return;
+  const amt=parseFloat(document.getElementById('dep-amt-'+id)?.value);
+  const date=document.getElementById('dep-date-'+id)?.value||todayISO;
+  const note=document.getElementById('dep-note-'+id)?.value.trim()||'';
+  if(isNaN(amt)||amt<=0) return;
+  if(!g.deposits) g.deposits=[];
+  g.deposits.push({id:'d_'+Date.now(),date,amount:amt,note});
+  save(); goalUI.depositGoalId=null; goalUI.expandedGoalId=id; render();
+};
+window.goalAskDeleteDeposit=(goalId,depositId)=>{ goalUI.deleteDepositKey={goalId,depositId}; render(); };
+window.goalCancelDeleteDeposit=()=>{ goalUI.deleteDepositKey=null; render(); };
+window.goalConfirmDeleteDeposit=()=>{
+  const {goalId,depositId}=goalUI.deleteDepositKey;
+  const g=state.goals.find(x=>x.id===goalId); if(!g) return;
+  g.deposits=g.deposits.filter(d=>d.id!==depositId);
+  save(); goalUI.deleteDepositKey=null; render();
+};
+
+// ═══════════════════════════════════════════════════════
+// RECURRING ACTIONS
+// ═══════════════════════════════════════════════════════
+window.recOpenAdd     = () => { recUI.showAddRec=true; recUI.editRecId=null; render(); setTimeout(()=>document.getElementById('rec-name')?.focus(),60); };
+window.recCloseAdd    = () => { recUI.showAddRec=false; render(); };
+window.recOpenEdit    = id => { recUI.editRecId=id; recUI.showAddRec=false; recUI.deleteRecId=null; render(); setTimeout(()=>document.getElementById('edit-rec-name')?.focus(),60); };
+window.recCancelEdit  = () => { recUI.editRecId=null; render(); };
+window.recAskDelete   = id => { recUI.deleteRecId=id; recUI.editRecId=null; render(); };
+window.recCancelDelete= () => { recUI.deleteRecId=null; render(); };
+window.recConfirmDelete=() => { state.recurring=state.recurring.filter(r=>r.id!==recUI.deleteRecId); save(); recUI.deleteRecId=null; render(); };
+window.recToggleActive= id => { const r=state.recurring.find(x=>x.id===id); if(r) r.active=!r.active; save(); render(); };
+window.recUpdateSub   = (catSel,subSel) => {
+  const catId=document.getElementById(catSel)?.value;
+  const el=document.getElementById(subSel); if(!el) return;
+  el.innerHTML='<option value="">— All subcategories —</option>';
+  const cat=state.categories.find(c=>c.id===catId);
+  if(cat) cat.subs.filter(s=>s.active).forEach(s=>{ el.innerHTML+=`<option value="${s.id}">${s.name}</option>`; });
+};
+window.recSave = () => {
+  const name=document.getElementById('rec-name')?.value.trim();
+  const amount=parseFloat(document.getElementById('rec-amount')?.value)||0;
+  const type=document.getElementById('rec-type')?.value||'expense';
+  const freq=document.getElementById('rec-freq')?.value||'monthly';
+  const due=document.getElementById('rec-due')?.value||todayISO;
+  const icon=document.getElementById('rec-icon')?.value.trim()||'🔁';
+  const catId=document.getElementById('rec-cat')?.value||'';
+  const subId=document.getElementById('rec-subcat')?.value||'';
+  const acctId=document.getElementById('rec-acct')?.value||'';
+  if(!name){document.getElementById('rec-err').textContent='Name is required.';return;}
+  state.recurring.push({id:'rec_'+Date.now(),name,icon,type,amount,frequency:freq,categoryId:catId,subcategoryId:subId,accountId:acctId,nextDue:due,active:true,lastPosted:null});
+  save(); recUI.showAddRec=false; render();
+};
+window.recUpdate = id => {
+  const r=state.recurring.find(x=>x.id===id); if(!r) return;
+  const name=document.getElementById('edit-rec-name')?.value.trim();
+  const amount=parseFloat(document.getElementById('edit-rec-amount')?.value);
+  const type=document.getElementById('edit-rec-type')?.value;
+  const freq=document.getElementById('edit-rec-freq')?.value;
+  const due=document.getElementById('edit-rec-due')?.value;
+  const icon=document.getElementById('edit-rec-icon')?.value.trim();
+  if(name) r.name=name; if(!isNaN(amount)) r.amount=amount; if(type) r.type=type;
+  if(freq) r.frequency=freq; if(due) r.nextDue=due; if(icon) r.icon=icon;
+  r.categoryId=document.getElementById('edit-rec-cat')?.value||'';
+  r.subcategoryId=document.getElementById('edit-rec-subcat')?.value||'';
+  r.accountId=document.getElementById('edit-rec-acct')?.value||'';
+  save(); recUI.editRecId=null; render();
 };
 
 // ═══════════════════════════════════════════════════════
@@ -767,9 +1036,10 @@ function renderDashboard() {
   const dailyBurn=m.avgMonthlyExpenses/30, runway=Math.floor(assets/dailyBurn);
   const savingsRate=m.income>0?((net/m.income)*100).toFixed(1):0;
   const maxCat=Math.max(...m.categories.map(c=>c.amount),1);
+  const forecastEnd=new Date(now.getTime()+(state.forecastDays||30)*24*60*60*1000).toISOString().split('T')[0];
   const forecastItems={
-    income: state.recurring.filter(r=>r.type==='income' &&daysUntil(r.dueDay)<=state.forecastDays),
-    expense:state.recurring.filter(r=>r.type==='expense'&&daysUntil(r.dueDay)<=state.forecastDays),
+    income: (state.recurring||[]).filter(r=>r.type==='income' &&r.active&&r.nextDue<=forecastEnd),
+    expense:(state.recurring||[]).filter(r=>r.type==='expense'&&r.active&&r.nextDue<=forecastEnd),
   };
   const forecastIncome=forecastItems.income.reduce((s,r)=>s+r.amount,0);
   const forecastExpense=forecastItems.expense.reduce((s,r)=>s+r.amount,0);
@@ -864,16 +1134,16 @@ function renderDashboard() {
     <div class="bg-[#1d2027] rounded-2xl p-5">
       <div class="flex items-center gap-2 mb-4"><span>🎯</span><span class="font-semibold">Financial Goals</span></div>
       ${state.goals.map(g=>{
-        const remaining=g.target-g.saved, months=monthsBetween(g.targetDate), monthly=months>0?remaining/months:0, daily=monthly/30;
-        const pct=Math.min((g.saved/g.target)*100,100);
+        const gs=computeGoalSaved(g);
+        const remaining=Math.max(g.target-gs.total,0), months=monthsBetween(g.targetDate), monthly=months>0?remaining/months:0, daily=monthly/30;
+        const pct=g.target>0?Math.min((gs.total/g.target)*100,100):0;
         const dateLabel=new Date(g.targetDate).toLocaleDateString('en-US',{month:'short',year:'numeric'});
-        return `<div class="rounded-xl p-4" style="background:#14171c">
           <div class="flex justify-between items-start mb-3">
             <div><div class="font-semibold">${g.icon} ${g.name}</div><div class="text-xs text-gray-500 mt-0.5">Target: ${dateLabel} · ${months} months away</div></div>
-            <div class="text-xs px-2 py-1 rounded-full bg-amber-900/30 text-amber-300">${g.status}</div>
+            <div class="text-xs px-2 py-1 rounded-full" style="background:rgba(99,102,241,0.15);color:#818cf8">${pct.toFixed(1)}%</div>
           </div>
-          <div class="flex justify-between text-sm mb-1.5"><span class="text-gray-500">Saved so far</span><span>${editable(g.saved,`goals.${g.id}.saved`,fmt)} <span class="text-gray-500">of ${fmt(g.target)}</span></span></div>
-          <div class="bg-[#0f1116] rounded-full overflow-hidden mb-4" style="height:6px"><div style="width:${pct}%;height:6px;background:linear-gradient(90deg,#f59e0b,#fbbf24);border-radius:3px"></div></div>
+          <div class="flex justify-between text-sm mb-1.5"><span class="text-gray-500">Saved so far</span><span class="font-semibold text-emerald-400">${fmt(gs.total)} <span class="text-gray-500">of ${fmt(g.target)}</span></span></div>
+          <div class="bg-[#0f1116] rounded-full overflow-hidden mb-4" style="height:6px"><div style="width:${pct.toFixed(1)}%;height:6px;background:linear-gradient(90deg,#f59e0b,#fbbf24);border-radius:3px"></div></div>
           <div class="grid grid-cols-3 gap-2">
             <div class="bg-[#1d2027] rounded-lg p-3"><div class="text-xs text-gray-500">Remaining</div><div class="font-semibold mt-0.5 text-sm">${fmt(remaining)}</div></div>
             <div class="bg-[#1d2027] rounded-lg p-3"><div class="text-xs text-gray-500">Monthly needed</div><div class="font-semibold mt-0.5 text-sm">${fmt(monthly)}</div></div>
@@ -886,8 +1156,589 @@ function renderDashboard() {
 }
 
 // ═══════════════════════════════════════════════════════
-// FAB OPEN — navigates to transactions then opens modal
+// RENDER RECURRING
 // ═══════════════════════════════════════════════════════
+function renderRecurring() {
+  const FREQ = { daily:'Daily', weekly:'Weekly', biweekly:'Bi-weekly', monthly:'Monthly', quarterly:'Quarterly', yearly:'Yearly' };
+  const FREQ_MO = { daily:30.4, weekly:4.33, biweekly:2.17, monthly:1, quarterly:0.333, yearly:0.0833 };
+  const recs = state.recurring || [];
+  const active = recs.filter(r=>r.active);
+  const monthlyExp = active.filter(r=>r.type==='expense').reduce((s,r)=>s+r.amount*(FREQ_MO[r.frequency]||1),0);
+  const monthlyInc = active.filter(r=>r.type==='income').reduce((s,r)=>s+r.amount*(FREQ_MO[r.frequency]||1),0);
+
+  const sorted = [...recs].sort((a,b)=>{
+    const sc=x=>{ if(!x.active) return 10; if(x.nextDue<todayISO) return 0; if(x.nextDue===todayISO) return 1; return 2; };
+    const d=sc(a)-sc(b); return d!==0?d:a.nextDue.localeCompare(b.nextDue);
+  });
+
+  function recModal(r) {
+    const isEdit=!!r, pfx=isEdit?'edit-':'', title=isEdit?'Edit Recurring':'Add Recurring';
+    const onClose=isEdit?'recCancelEdit()':'recCloseAdd()';
+    const onSave=isEdit?`recUpdate('${r.id}')`:'recSave()';
+    const errId=isEdit?'':'rec-err';
+    const cats=state.categories.filter(c=>c.active);
+    const selCat=r?.categoryId||'';
+    const selSub=r?.subcategoryId||'';
+    const subs=selCat?(cats.find(c=>c.id===selCat)?.subs||[]).filter(s=>s.active):[];
+    return `
+      <div class="fixed inset-0 flex items-end sm:items-center justify-center" style="z-index:200;background:rgba(0,0,0,0.8)" onclick="${onClose}">
+        <div class="w-full sm:w-96 rounded-t-3xl sm:rounded-2xl p-6" style="background:#1d2027;border:1px solid #374151;max-height:92vh;overflow-y:auto" onclick="event.stopPropagation()">
+          <div class="flex items-center justify-between mb-5">
+            <div class="text-lg font-bold">${title}</div>
+            <button onclick="${onClose}" style="background:none;border:none;color:#6b7280;cursor:pointer;font-size:22px;line-height:1">×</button>
+          </div>
+          <div class="grid gap-3 mb-3" style="grid-template-columns:56px 1fr">
+            <div><div class="field-label">ICON</div><input id="${pfx}rec-icon" ${r?`value="${r.icon||'🔁'}"`:'placeholder="🔁"'} class="field-input" style="font-size:20px;text-align:center;padding:8px 4px"></div>
+            <div><div class="field-label">NAME *</div><input id="${pfx}rec-name" type="text" ${r?`value="${r.name}"`:'placeholder="e.g. Rent"'} class="field-input"></div>
+          </div>
+          <div class="grid grid-cols-2 gap-3 mb-3">
+            <div><div class="field-label">TYPE</div>
+              <select id="${pfx}rec-type" class="field-select">
+                <option value="expense" ${r?.type==='expense'||!r?'selected':''}>💸 Expense</option>
+                <option value="income"  ${r?.type==='income'?'selected':''}>💰 Income</option>
+              </select>
+            </div>
+            <div><div class="field-label">FREQUENCY</div>
+              <select id="${pfx}rec-freq" class="field-select">
+                ${Object.entries(FREQ).map(([v,l])=>`<option value="${v}" ${r?.frequency===v?'selected':''}>${l}</option>`).join('')}
+              </select>
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-3 mb-3">
+            <div><div class="field-label">AMOUNT (₱) *</div><input id="${pfx}rec-amount" type="number" step="0.01" min="0" ${r?`value="${r.amount}"`:'placeholder="0.00"'} class="field-input"></div>
+            <div><div class="field-label">NEXT DUE DATE</div><input id="${pfx}rec-due" type="date" value="${r?.nextDue||todayISO}" class="field-input"></div>
+          </div>
+          <div class="mb-3"><div class="field-label">CATEGORY (optional)</div>
+            <select id="${pfx}rec-cat" class="field-select" onchange="recUpdateSub('${pfx}rec-cat','${pfx}rec-subcat')">
+              <option value="">— None —</option>
+              ${cats.map(c=>`<option value="${c.id}" ${selCat===c.id?'selected':''}>${c.icon} ${c.name}</option>`).join('')}
+            </select>
+          </div>
+          <div class="mb-3"><div class="field-label">SUBCATEGORY (optional)</div>
+            <select id="${pfx}rec-subcat" class="field-select">
+              <option value="">— All —</option>
+              ${subs.map(s=>`<option value="${s.id}" ${selSub===s.id?'selected':''}>${s.name}</option>`).join('')}
+            </select>
+          </div>
+          <div class="mb-5"><div class="field-label">ACCOUNT (optional)</div>
+            <select id="${pfx}rec-acct" class="field-select">
+              <option value="">— None —</option>
+              ${state.accounts.map(a=>`<option value="${a.id}" ${r?.accountId===a.id?'selected':''}>${a.icon||''} ${a.name}</option>`).join('')}
+            </select>
+          </div>
+          ${errId?`<div id="${errId}" class="text-red-400 text-xs mb-3"></div>`:''}
+          <div class="flex gap-3">
+            <button onclick="${onSave}" class="flex-1 rounded-xl py-3 font-semibold text-white text-sm" style="background:#6366f1;border:none;cursor:pointer">${isEdit?'Save Changes':'Add Recurring'}</button>
+            <button onclick="${onClose}" class="flex-1 rounded-xl py-3 text-sm" style="background:#0f1116;border:1px solid #374151;color:#9ca3af;cursor:pointer">Cancel</button>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  function recCard(r) {
+    const cat=r.categoryId?state.categories.find(c=>c.id===r.categoryId):null;
+    const sub=cat&&r.subcategoryId?cat.subs.find(s=>s.id===r.subcategoryId):null;
+    const acct=r.accountId?state.accounts.find(a=>a.id===r.accountId):null;
+    const isOverdue=r.nextDue<todayISO, isDueToday=r.nextDue===todayISO;
+    const typeColor=r.type==='income'?'#34d399':'#f87171';
+    const typeBg=r.type==='income'?'rgba(52,211,153,0.12)':'rgba(248,113,113,0.12)';
+
+    if (recUI.deleteRecId===r.id) return `
+      <div class="rounded-2xl p-4 mb-3" style="background:#1d2027;border:1px solid #7f1d1d">
+        <div class="text-sm mb-3" style="color:#fca5a5">Delete <strong>${r.icon} ${r.name}</strong>? Cannot be undone.</div>
+        <div class="flex gap-2">
+          <button onclick="recConfirmDelete()" class="rounded-lg px-5 py-2 text-sm font-semibold" style="background:#ef4444;border:none;color:#fff;cursor:pointer">Delete</button>
+          <button onclick="recCancelDelete()" class="rounded-lg px-5 py-2 text-sm" style="background:#374151;border:none;color:#9ca3af;cursor:pointer">Cancel</button>
+        </div>
+      </div>`;
+
+    return `
+      <div class="rounded-2xl p-4 mb-3" style="background:#1d2027;${!r.active?'opacity:0.6':''}">
+        <div class="flex items-start justify-between mb-3">
+          <div class="flex items-center gap-3">
+            <div class="flex-shrink-0 flex items-center justify-center rounded-xl text-xl" style="width:42px;height:42px;background:${typeBg}">${r.icon||'🔁'}</div>
+            <div>
+              <div class="font-semibold text-sm" style="color:#e5e7eb">${r.name}</div>
+              <div class="flex items-center gap-2 mt-1 flex-wrap">
+                <span class="text-xs px-2 py-0.5 rounded-full font-medium" style="background:${typeBg};color:${typeColor}">${r.type==='income'?'💰 Income':'💸 Expense'}</span>
+                <span class="text-xs px-2 py-0.5 rounded-full" style="background:#0f1116;color:#9ca3af">${FREQ[r.frequency]||r.frequency}</span>
+                ${!r.active?`<span class="text-xs px-2 py-0.5 rounded-full" style="background:#374151;color:#9ca3af">⏸ Paused</span>`:''}
+                ${isOverdue&&r.active?`<span class="text-xs px-2 py-0.5 rounded-full font-semibold" style="background:rgba(248,113,113,0.15);color:#f87171">⚠️ Overdue</span>`:''}
+                ${isDueToday?`<span class="text-xs px-2 py-0.5 rounded-full font-semibold" style="background:rgba(251,191,36,0.15);color:#fbbf24">⚡ Due today</span>`:''}
+              </div>
+            </div>
+          </div>
+          <div class="text-right flex-shrink-0 ml-2">
+            <div class="font-bold text-sm" style="color:${typeColor}">${r.type==='income'?'+':'-'}${fmt2(r.amount)}</div>
+            <div class="flex gap-1 mt-1 justify-end">
+              <button onclick="recToggleActive('${r.id}')" title="${r.active?'Pause':'Resume'}" style="background:#0f1116;border:none;color:#9ca3af;cursor:pointer;border-radius:8px;padding:5px 7px;font-size:13px">${r.active?'⏸':'▶'}</button>
+              <button onclick="recOpenEdit('${r.id}')" style="background:#0f1116;border:none;color:#9ca3af;cursor:pointer;border-radius:8px;padding:5px 7px;font-size:13px">✏️</button>
+              <button onclick="recAskDelete('${r.id}')" style="background:#0f1116;border:none;color:#9ca3af;cursor:pointer;border-radius:8px;padding:5px 7px;font-size:13px">🗑️</button>
+            </div>
+          </div>
+        </div>
+        <div class="flex items-center gap-4 text-xs flex-wrap" style="color:#6b7280">
+          <span style="color:${isOverdue?'#f87171':isDueToday?'#fbbf24':'#6b7280'}">📅 ${isOverdue?'Overdue · ':isDueToday?'Today · ':'Next: '}${fmtDate(r.nextDue)}</span>
+          ${cat?`<span>${cat.icon} ${cat.name}${sub?' › '+sub.name:''}</span>`:''}
+          ${acct?`<span>${acct.icon||'💳'} ${acct.name}</span>`:''}
+        </div>
+      </div>`;
+  }
+
+  const editRec = recUI.editRecId ? recs.find(r=>r.id===recUI.editRecId) : null;
+
+  return `${renderNav()}
+    <div class="flex items-center justify-between mb-1">
+      <div class="text-2xl font-bold">Recurring</div>
+      <button onclick="recOpenAdd()" class="rounded-xl px-4 py-2.5 text-sm font-semibold text-white flex-shrink-0" style="background:#6366f1;border:none;cursor:pointer">+ Add</button>
+    </div>
+    <div class="section-label mb-4">${recs.length} item${recs.length!==1?'s':''} · ${active.length} active</div>
+
+    ${recAutoPostedCount>0?`
+    <div class="flex items-center gap-3 rounded-xl p-3 mb-4 text-sm" style="background:rgba(52,211,153,0.1);border:1px solid rgba(52,211,153,0.2)">
+      <span>⚡</span>
+      <span style="color:#6ee7b7"><strong>${recAutoPostedCount} transaction${recAutoPostedCount>1?'s':''}</strong> were auto-posted since your last visit</span>
+    </div>`:''}
+
+    <div class="grid grid-cols-2 gap-3 mb-5">
+      <div class="rounded-2xl p-4" style="background:#1d2027">
+        <div class="text-xs mb-1" style="color:#6b7280">Monthly Expenses</div>
+        <div class="text-xl font-bold text-red-400">-${fmt2(monthlyExp)}</div>
+        <div class="text-xs mt-0.5" style="color:#4b5563">${active.filter(r=>r.type==='expense').length} items</div>
+      </div>
+      <div class="rounded-2xl p-4" style="background:#1d2027">
+        <div class="text-xs mb-1" style="color:#6b7280">Monthly Income</div>
+        <div class="text-xl font-bold text-emerald-400">+${fmt2(monthlyInc)}</div>
+        <div class="text-xs mt-0.5" style="color:#4b5563">${active.filter(r=>r.type==='income').length} items</div>
+      </div>
+    </div>
+
+    ${recs.length===0?`
+      <div class="flex flex-col items-center justify-center py-20 text-center">
+        <div class="text-5xl mb-4">🔁</div>
+        <div class="text-xl font-bold mb-2">No recurring items</div>
+        <div class="text-sm max-w-xs mb-5" style="color:#6b7280">Add your regular bills, salaries, and income so they post automatically.</div>
+        <button onclick="recOpenAdd()" class="rounded-xl px-6 py-3 text-sm font-semibold text-white" style="background:#6366f1;border:none;cursor:pointer">+ Add your first item</button>
+      </div>`:sorted.map(r=>recCard(r)).join('')}
+
+    ${recUI.showAddRec ? recModal(null) : ''}
+    ${editRec ? recModal(editRec) : ''}`;
+}
+
+
+function renderGoals() {
+  function goalCard(g) {
+    const gs=computeGoalSaved(g);
+    const remaining=Math.max(g.target-gs.total,0);
+    const months=monthsBetween(g.targetDate);
+    const monthly=months>0?remaining/months:remaining, daily=monthly/30;
+    const pct=g.target>0?Math.min((gs.total/g.target)*100,100):0;
+    const barColor=pct>=66?'linear-gradient(90deg,#10b981,#34d399)':pct>=33?'linear-gradient(90deg,#f59e0b,#fbbf24)':'linear-gradient(90deg,#6366f1,#818cf8)';
+    const pctColor=pct>=66?'#34d399':pct>=33?'#fbbf24':'#818cf8';
+    const dateLabel=new Date(g.targetDate).toLocaleDateString('en-US',{month:'short',year:'numeric'});
+    const deposits=g.deposits||[];
+    const isDepositOpen=goalUI.depositGoalId===g.id;
+    const isHistoryOpen=goalUI.expandedGoalId===g.id;
+    const linkedCat=g.linkedCategoryId?state.categories.find(c=>c.id===g.linkedCategoryId):null;
+    const linkedSub=g.linkedSubcategoryId&&linkedCat?linkedCat.subs.find(s=>s.id===g.linkedSubcategoryId):null;
+
+    if (goalUI.deleteGoalId===g.id) return `
+      <div class="rounded-2xl p-5 mb-4" style="background:#1d2027;border:1px solid #7f1d1d">
+        <div class="text-sm mb-3" style="color:#fca5a5">Delete <strong>${g.icon} ${g.name}</strong>? All deposit history will be lost. Cannot be undone.</div>
+        <div class="flex gap-2">
+          <button onclick="goalConfirmDelete()" class="rounded-lg px-5 py-2 text-sm font-semibold" style="background:#ef4444;border:none;color:#fff;cursor:pointer">Delete Goal</button>
+          <button onclick="goalCancelDelete()" class="rounded-lg px-5 py-2 text-sm" style="background:#374151;border:none;color:#9ca3af;cursor:pointer">Cancel</button>
+        </div>
+      </div>`;
+
+    const depositForm=isDepositOpen?`
+      <div class="mt-4 pt-4" style="border-top:1px solid #374151">
+        <div class="section-label mb-3">ADD DEPOSIT</div>
+        <div class="grid grid-cols-2 gap-2 mb-2">
+          <div><div class="field-label">AMOUNT (₱) *</div><input id="dep-amt-${g.id}" type="number" step="0.01" min="0" placeholder="0.00" class="field-input"></div>
+          <div><div class="field-label">DATE</div><input id="dep-date-${g.id}" type="date" value="${todayISO}" class="field-input"></div>
+        </div>
+        <div class="mb-3"><div class="field-label">NOTE (optional)</div><input id="dep-note-${g.id}" type="text" placeholder="e.g. Monthly savings" class="field-input"></div>
+        <div class="flex gap-2">
+          <button onclick="goalAddDeposit('${g.id}')" class="flex-1 rounded-xl py-2.5 text-sm font-semibold text-white" style="background:#6366f1;border:none;cursor:pointer">Save Deposit</button>
+          <button onclick="goalCloseDeposit()" class="flex-1 rounded-xl py-2.5 text-sm" style="background:#374151;border:none;color:#9ca3af;cursor:pointer">Cancel</button>
+        </div>
+      </div>`:'';
+
+    const historyRows=deposits.slice().reverse().map(d=>{
+      const isDel=goalUI.deleteDepositKey&&goalUI.deleteDepositKey.goalId===g.id&&goalUI.deleteDepositKey.depositId===d.id;
+      if(isDel) return `
+        <div class="flex items-center gap-3 py-2" style="border-bottom:1px solid #1f2937">
+          <div class="flex-1 text-xs" style="color:#fca5a5">Remove ${fmt(d.amount)} deposit?</div>
+          <button onclick="goalConfirmDeleteDeposit()" class="text-xs px-3 py-1 rounded-lg" style="background:#ef4444;border:none;color:#fff;cursor:pointer">Remove</button>
+          <button onclick="goalCancelDeleteDeposit()" class="text-xs px-3 py-1 rounded-lg" style="background:#374151;border:none;color:#9ca3af;cursor:pointer">Keep</button>
+        </div>`;
+      return `
+        <div class="flex items-center gap-3 py-2" style="border-bottom:1px solid #1f2937">
+          <div class="flex-1 min-w-0">
+            <div class="text-sm font-semibold text-emerald-400">+${fmt(d.amount)}</div>
+            <div class="text-xs truncate" style="color:#6b7280">${fmtDate(d.date)}${d.note?' · '+d.note:''}</div>
+          </div>
+          <button onclick="goalAskDeleteDeposit('${g.id}','${d.id}')" style="background:none;border:none;color:#4b5563;cursor:pointer;font-size:18px;padding:0 4px;line-height:1;flex-shrink:0">×</button>
+        </div>`;
+    }).join('');
+
+    const historySection=isHistoryOpen?`
+      <div class="mt-4 pt-4" style="border-top:1px solid #374151">
+        <div class="section-label mb-2">DEPOSIT HISTORY</div>
+        ${deposits.length===0
+          ?`<div class="text-sm text-center py-3" style="color:#4b5563">No manual deposits yet.</div>`
+          :historyRows}
+      </div>`:'';
+
+    return `
+      <div class="rounded-2xl p-5 mb-4" style="background:#1d2027">
+        <div class="flex items-start justify-between mb-4">
+          <div>
+            <div class="flex items-center gap-2 text-lg font-bold">${g.icon} ${g.name}</div>
+            <div class="text-xs mt-0.5" style="color:#6b7280">Target ${dateLabel} · ${months} month${months!==1?'s':''} away</div>
+          </div>
+          <div class="flex gap-1 flex-shrink-0">
+            <button onclick="goalOpenEdit('${g.id}')" style="background:#0f1116;border:none;color:#9ca3af;cursor:pointer;border-radius:8px;padding:6px 8px;font-size:13px">✏️</button>
+            <button onclick="goalAskDelete('${g.id}')" style="background:#0f1116;border:none;color:#9ca3af;cursor:pointer;border-radius:8px;padding:6px 8px;font-size:13px">🗑️</button>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-3 mb-4">
+          <div class="flex-1 rounded-full overflow-hidden" style="height:9px;background:#0f1116">
+            <div style="width:${pct.toFixed(1)}%;height:9px;background:${barColor};border-radius:5px;transition:width 0.5s ease"></div>
+          </div>
+          <span class="text-sm font-bold flex-shrink-0" style="min-width:48px;text-align:right;color:${pctColor}">${pct.toFixed(1)}%</span>
+        </div>
+
+        <div class="grid grid-cols-3 gap-2 mb-3">
+          <div class="rounded-xl p-3 text-center" style="background:#0f1116">
+            <div class="text-xs mb-1" style="color:#6b7280">Saved</div>
+            <div class="font-bold text-sm text-emerald-400">${fmt(gs.total)}</div>
+          </div>
+          <div class="rounded-xl p-3 text-center" style="background:#0f1116">
+            <div class="text-xs mb-1" style="color:#6b7280">Target</div>
+            <div class="font-bold text-sm">${fmt(g.target)}</div>
+          </div>
+          <div class="rounded-xl p-3 text-center" style="background:#0f1116">
+            <div class="text-xs mb-1" style="color:#6b7280">Remaining</div>
+            <div class="font-bold text-sm text-amber-400">${fmt(remaining)}</div>
+          </div>
+        </div>
+
+        <div class="rounded-xl p-3 mb-3" style="background:#0f1116">
+          <div class="flex justify-between text-sm mb-1.5">
+            <span style="color:#6b7280">Monthly needed</span><span class="font-semibold">${fmt(monthly)}</span>
+          </div>
+          <div class="flex justify-between text-sm">
+            <span style="color:#6b7280">Daily needed</span><span class="font-semibold">${fmt(daily)}</span>
+          </div>
+        </div>
+
+        ${linkedCat?`
+        <div class="flex items-center gap-2 mb-3 px-3 py-2 rounded-xl text-xs" style="background:rgba(99,102,241,0.1);border:1px solid rgba(99,102,241,0.2)">
+          <span>🔗</span>
+          <span style="color:#a5b4fc">Auto-tracking: ${linkedCat.icon} ${linkedCat.name}${linkedSub?' → '+linkedSub.name:''}</span>
+          <span class="ml-auto font-semibold" style="color:#818cf8">+${fmt(gs.auto)}</span>
+        </div>`:''}
+
+        <div class="flex gap-2">
+          <button onclick="goalOpenDeposit('${g.id}')" class="flex-1 rounded-xl py-2.5 text-sm font-semibold text-white" style="background:#6366f1;border:none;cursor:pointer">+ Deposit</button>
+          <button onclick="goalToggleHistory('${g.id}')" class="flex-1 rounded-xl py-2.5 text-sm font-semibold" style="background:#0f1116;border:1px solid ${isHistoryOpen?'#6366f1':'#374151'};color:${isHistoryOpen?'#818cf8':'#9ca3af'};cursor:pointer">📋 History (${deposits.length})</button>
+        </div>
+        ${depositForm}${historySection}
+      </div>`;
+  }
+
+  const editGoal=goalUI.editGoalId?state.goals.find(g=>g.id===goalUI.editGoalId):null;
+  const addModal=goalUI.showAddGoal?`
+    <div class="fixed inset-0 flex items-end sm:items-center justify-center" style="z-index:200;background:rgba(0,0,0,0.8)" onclick="goalCloseAdd()">
+      <div class="w-full sm:w-96 rounded-t-3xl sm:rounded-2xl p-6" style="background:#1d2027;border:1px solid #374151;max-height:92vh;overflow-y:auto" onclick="event.stopPropagation()">
+        <div class="flex items-center justify-between mb-5">
+          <div class="text-lg font-bold">New Goal</div>
+          <button onclick="goalCloseAdd()" style="background:none;border:none;color:#6b7280;cursor:pointer;font-size:22px;line-height:1">×</button>
+        </div>
+        <div class="grid gap-3 mb-3" style="grid-template-columns:56px 1fr">
+          <div><div class="field-label">ICON</div><input id="goal-icon" placeholder="🎯" class="field-input" style="font-size:20px;text-align:center;padding:8px 4px"></div>
+          <div><div class="field-label">GOAL NAME *</div><input id="goal-name" type="text" placeholder="e.g. Emergency Fund" class="field-input"></div>
+        </div>
+        <div class="grid grid-cols-2 gap-3 mb-3">
+          <div><div class="field-label">TARGET (₱) *</div><input id="goal-target" type="number" step="0.01" min="0" placeholder="0.00" class="field-input"></div>
+          <div><div class="field-label">TARGET DATE *</div><input id="goal-date" type="date" class="field-input"></div>
+        </div>
+        <div class="mb-3"><div class="field-label">AUTO-TRACK CATEGORY (optional)</div>
+          <select id="goal-cat" class="field-select" onchange="goalUpdateSub('goal-cat','goal-subcat')">
+            <option value="">— None (manual only) —</option>
+            ${state.categories.filter(c=>c.active).map(c=>`<option value="${c.id}">${c.icon} ${c.name}</option>`).join('')}
+          </select>
+        </div>
+        <div class="mb-5"><div class="field-label">SUBCATEGORY (optional)</div>
+          <select id="goal-subcat" class="field-select"><option value="">— All subcategories —</option></select>
+        </div>
+        <div id="goal-err" class="text-red-400 text-xs mb-3"></div>
+        <div class="flex gap-3">
+          <button onclick="goalSave()" class="flex-1 rounded-xl py-3 font-semibold text-white text-sm" style="background:#6366f1;border:none;cursor:pointer">Create Goal</button>
+          <button onclick="goalCloseAdd()" class="flex-1 rounded-xl py-3 text-sm" style="background:#0f1116;border:1px solid #374151;color:#9ca3af;cursor:pointer">Cancel</button>
+        </div>
+      </div>
+    </div>`:'';
+
+  const editModal=editGoal?`
+    <div class="fixed inset-0 flex items-end sm:items-center justify-center" style="z-index:200;background:rgba(0,0,0,0.8)" onclick="goalCancelEdit()">
+      <div class="w-full sm:w-96 rounded-t-3xl sm:rounded-2xl p-6" style="background:#1d2027;border:1px solid #374151;max-height:92vh;overflow-y:auto" onclick="event.stopPropagation()">
+        <div class="flex items-center justify-between mb-5">
+          <div class="text-lg font-bold">Edit Goal</div>
+          <button onclick="goalCancelEdit()" style="background:none;border:none;color:#6b7280;cursor:pointer;font-size:22px;line-height:1">×</button>
+        </div>
+        <div class="grid gap-3 mb-3" style="grid-template-columns:56px 1fr">
+          <div><div class="field-label">ICON</div><input id="edit-goal-icon" value="${editGoal.icon||'🎯'}" class="field-input" style="font-size:20px;text-align:center;padding:8px 4px"></div>
+          <div><div class="field-label">GOAL NAME *</div><input id="edit-goal-name" type="text" value="${editGoal.name}" class="field-input"></div>
+        </div>
+        <div class="grid grid-cols-2 gap-3 mb-3">
+          <div><div class="field-label">TARGET (₱) *</div><input id="edit-goal-target" type="number" step="0.01" value="${editGoal.target}" class="field-input"></div>
+          <div><div class="field-label">TARGET DATE *</div><input id="edit-goal-date" type="date" value="${editGoal.targetDate}" class="field-input"></div>
+        </div>
+        <div class="mb-3"><div class="field-label">AUTO-TRACK CATEGORY</div>
+          <select id="edit-goal-cat" class="field-select" onchange="goalUpdateSub('edit-goal-cat','edit-goal-subcat')">
+            <option value="">— None —</option>
+            ${state.categories.filter(c=>c.active).map(c=>`<option value="${c.id}" ${editGoal.linkedCategoryId===c.id?'selected':''}>${c.icon} ${c.name}</option>`).join('')}
+          </select>
+        </div>
+        <div class="mb-5"><div class="field-label">SUBCATEGORY</div>
+          <select id="edit-goal-subcat" class="field-select">
+            <option value="">— All subcategories —</option>
+            ${editGoal.linkedCategoryId?(state.categories.find(c=>c.id===editGoal.linkedCategoryId)?.subs||[]).filter(s=>s.active).map(s=>`<option value="${s.id}" ${editGoal.linkedSubcategoryId===s.id?'selected':''}>${s.name}</option>`).join(''):''}
+          </select>
+        </div>
+        <div class="flex gap-3">
+          <button onclick="goalUpdate('${editGoal.id}')" class="flex-1 rounded-xl py-3 font-semibold text-white text-sm" style="background:#6366f1;border:none;cursor:pointer">Save Changes</button>
+          <button onclick="goalCancelEdit()" class="flex-1 rounded-xl py-3 text-sm" style="background:#0f1116;border:1px solid #374151;color:#9ca3af;cursor:pointer">Cancel</button>
+        </div>
+      </div>
+    </div>`:'';
+
+  const totalSaved=state.goals.reduce((s,g)=>s+computeGoalSaved(g).total,0);
+  const totalTarget=state.goals.reduce((s,g)=>s+g.target,0);
+
+  return `${renderNav()}
+    <div class="flex items-center justify-between mb-1">
+      <div class="text-2xl font-bold">Goals</div>
+      <button onclick="goalOpenAdd()" class="rounded-xl px-4 py-2.5 text-sm font-semibold text-white flex-shrink-0" style="background:#6366f1;border:none;cursor:pointer">+ Add Goal</button>
+    </div>
+    <div class="section-label mb-5">${state.goals.length} Goal${state.goals.length!==1?'s':''} · ${fmt(totalSaved)} saved of ${fmt(totalTarget)}</div>
+    ${state.goals.length===0?`
+      <div class="flex flex-col items-center justify-center py-20 text-center">
+        <div class="text-5xl mb-4">🎯</div>
+        <div class="text-xl font-bold mb-2">No goals yet</div>
+        <div class="text-sm max-w-xs mb-5" style="color:#6b7280">Set a savings goal and track your progress.</div>
+        <button onclick="goalOpenAdd()" class="rounded-xl px-6 py-3 text-sm font-semibold text-white" style="background:#6366f1;border:none;cursor:pointer">+ Create your first goal</button>
+      </div>`:state.goals.map(g=>goalCard(g)).join('')}
+    ${addModal}${editModal}`;
+}
+
+
+function renderAccounts() {
+  const TC = {
+    bank:    { label:'Bank',     icon:'🏦', color:'#3b82f6', bg:'rgba(59,130,246,0.13)'  },
+    ewallet: { label:'E-Wallet', icon:'📱', color:'#8b5cf6', bg:'rgba(139,92,246,0.13)'  },
+    cash:    { label:'Cash',     icon:'💵', color:'#10b981', bg:'rgba(16,185,129,0.13)'  },
+  };
+  const banks    = state.accounts.filter(a=>(a.type||'bank')==='bank');
+  const ewallets = state.accounts.filter(a=>a.type==='ewallet');
+  const cashList = state.accounts.filter(a=>a.type==='cash');
+  const sumB=banks.reduce((s,a)=>s+a.balance,0), sumE=ewallets.reduce((s,a)=>s+a.balance,0), sumC=cashList.reduce((s,a)=>s+a.balance,0);
+  const totalDebit=sumB+sumE+sumC, totalOwed=state.creditCards.reduce((s,c)=>s+c.outstanding,0), nw=totalDebit-totalOwed;
+
+  function acctCard(a) {
+    const conf=TC[a.type||'bank'];
+    if (acctUI.deleteAcctId===a.id) return `
+      <div class="rounded-xl p-4 mb-2" style="background:#1a0f0f;border:1px solid #7f1d1d">
+        <div class="text-sm mb-3" style="color:#fca5a5">Delete <strong>${a.name}</strong>? Cannot be undone.</div>
+        <div class="flex gap-2">
+          <button onclick="acctConfirmDelete()" class="text-xs px-4 py-2 rounded-lg font-semibold" style="background:#ef4444;border:none;color:#fff;cursor:pointer">Delete</button>
+          <button onclick="acctCancelDelete()" class="text-xs px-4 py-2 rounded-lg" style="background:#374151;border:none;color:#9ca3af;cursor:pointer">Cancel</button>
+        </div>
+      </div>`;
+    if (acctUI.editAcctId===a.id) return `
+      <div class="rounded-xl p-4 mb-2" style="background:#0f1116;border:1px solid #6366f1">
+        <div class="grid gap-3 mb-3" style="grid-template-columns:56px 1fr">
+          <div><div class="field-label">ICON</div><input id="edit-acct-icon-${a.id}" value="${a.icon||conf.icon}" class="field-input" style="font-size:20px;text-align:center;padding:8px 4px"></div>
+          <div><div class="field-label">NAME</div><input id="edit-acct-name-${a.id}" value="${a.name}" class="field-input"></div>
+        </div>
+        <div class="mb-3"><div class="field-label">BALANCE (₱)</div><input id="edit-acct-bal-${a.id}" type="number" step="0.01" value="${a.balance}" class="field-input"></div>
+        <div class="flex gap-2">
+          <button onclick="acctUpdate('${a.id}')" class="flex-1 rounded-lg py-2 text-sm font-semibold text-white" style="background:#6366f1;border:none;cursor:pointer">Save</button>
+          <button onclick="acctCancelEdit()" class="flex-1 rounded-lg py-2 text-sm" style="background:#374151;border:none;color:#9ca3af;cursor:pointer">Cancel</button>
+        </div>
+      </div>`;
+    return `
+      <div class="flex items-center gap-3 p-3 rounded-xl mb-2" style="background:#0f1116">
+        <div class="flex-shrink-0 flex items-center justify-center rounded-xl text-xl" style="width:42px;height:42px;background:${conf.bg}">${a.icon||conf.icon}</div>
+        <div class="flex-1 min-w-0">
+          <div class="text-sm font-semibold" style="color:#e5e7eb">${a.name}</div>
+          <div class="text-xs" style="color:#6b7280">${conf.label}</div>
+        </div>
+        <div class="font-semibold text-sm flex-shrink-0">${fmt2(a.balance)}</div>
+        <div class="flex gap-1 flex-shrink-0">
+          <button onclick="acctOpenEdit('${a.id}')" style="background:#1d2027;border:none;color:#9ca3af;cursor:pointer;border-radius:8px;padding:5px 8px;font-size:13px">✏️</button>
+          <button onclick="acctAskDelete('${a.id}')" style="background:#1d2027;border:none;color:#9ca3af;cursor:pointer;border-radius:8px;padding:5px 8px;font-size:13px">🗑️</button>
+        </div>
+      </div>`;
+  }
+
+  function section(title, list, type, total) {
+    const conf=TC[type];
+    return `
+      <div class="rounded-2xl p-4 mb-4" style="background:#1d2027">
+        <div class="flex items-center justify-between mb-3">
+          <div class="flex items-center gap-2">
+            <span>${conf.icon}</span><span class="font-semibold">${title}</span>
+            <span class="text-xs px-2 py-0.5 rounded-full font-medium" style="background:${conf.bg};color:${conf.color}">${list.length}</span>
+          </div>
+          <div class="flex items-center gap-3">
+            <span class="text-sm font-semibold" style="color:#9ca3af">${fmt2(total)}</span>
+            <button onclick="acctOpenAdd('${type}')" class="text-xs px-3 py-1.5 rounded-lg font-semibold text-white" style="background:#6366f1;border:none;cursor:pointer">+ Add</button>
+          </div>
+        </div>
+        ${list.map(a=>acctCard(a)).join('')}
+        ${list.length===0?`<div class="text-center py-4 text-sm" style="color:#4b5563">No ${title.toLowerCase()} added yet</div>`:''}
+      </div>`;
+  }
+
+  function ccCard(c) {
+    const avail=c.limit-c.outstanding, pct=c.limit>0?Math.min((c.outstanding/c.limit)*100,100):0;
+    const dl=daysUntil(c.dueDay), barColor=pct>80?'#ef4444':pct>50?'#f59e0b':'#10b981';
+    if (acctUI.deleteCCId===c.id) return `
+      <div class="rounded-xl p-4 mb-3" style="background:#1a0f0f;border:1px solid #7f1d1d">
+        <div class="text-sm mb-3" style="color:#fca5a5">Delete <strong>${c.name}</strong>? Cannot be undone.</div>
+        <div class="flex gap-2">
+          <button onclick="ccConfirmDelete()" class="text-xs px-4 py-2 rounded-lg font-semibold" style="background:#ef4444;border:none;color:#fff;cursor:pointer">Delete</button>
+          <button onclick="ccCancelDelete()" class="text-xs px-4 py-2 rounded-lg" style="background:#374151;border:none;color:#9ca3af;cursor:pointer">Cancel</button>
+        </div>
+      </div>`;
+    if (acctUI.editCCId===c.id) return `
+      <div class="rounded-xl p-4 mb-3" style="background:#0f1116;border:1px solid #6366f1">
+        <div class="grid gap-3 mb-3" style="grid-template-columns:56px 1fr">
+          <div><div class="field-label">ICON</div><input id="edit-cc-icon-${c.id}" value="${c.icon||'💳'}" class="field-input" style="font-size:20px;text-align:center;padding:8px 4px"></div>
+          <div><div class="field-label">NAME</div><input id="edit-cc-name-${c.id}" value="${c.name}" class="field-input"></div>
+        </div>
+        <div class="grid grid-cols-2 gap-3 mb-3">
+          <div><div class="field-label">OUTSTANDING (₱)</div><input id="edit-cc-owed-${c.id}" type="number" step="0.01" value="${c.outstanding}" class="field-input"></div>
+          <div><div class="field-label">CREDIT LIMIT (₱)</div><input id="edit-cc-lim-${c.id}" type="number" step="0.01" value="${c.limit}" class="field-input"></div>
+        </div>
+        <div class="mb-3"><div class="field-label">DUE DAY (1–31)</div><input id="edit-cc-due-${c.id}" type="number" min="1" max="31" value="${c.dueDay}" class="field-input"></div>
+        <div class="flex gap-2">
+          <button onclick="ccUpdate('${c.id}')" class="flex-1 rounded-lg py-2 text-sm font-semibold text-white" style="background:#6366f1;border:none;cursor:pointer">Save</button>
+          <button onclick="ccCancelEdit()" class="flex-1 rounded-lg py-2 text-sm" style="background:#374151;border:none;color:#9ca3af;cursor:pointer">Cancel</button>
+        </div>
+      </div>`;
+    return `
+      <div class="rounded-xl p-4 mb-3" style="background:#0f1116">
+        <div class="flex items-start justify-between mb-3">
+          <div class="flex items-center gap-3">
+            <div class="flex-shrink-0 flex items-center justify-center rounded-xl text-xl" style="width:42px;height:42px;background:rgba(245,158,11,0.12)">${c.icon||'💳'}</div>
+            <div>
+              <div class="font-semibold text-sm" style="color:#e5e7eb">${c.name}</div>
+              <div class="text-xs mt-0.5" style="color:#6b7280">Due ${c.dueDay}${sfx(c.dueDay)} · <span style="color:${dl<=5?'#f87171':dl<=10?'#fbbf24':'#6b7280'}">${dl}d away</span></div>
+            </div>
+          </div>
+          <div class="flex gap-1 flex-shrink-0">
+            <button onclick="ccOpenEdit('${c.id}')" style="background:#1d2027;border:none;color:#9ca3af;cursor:pointer;border-radius:8px;padding:5px 8px;font-size:13px">✏️</button>
+            <button onclick="ccAskDelete('${c.id}')" style="background:#1d2027;border:none;color:#9ca3af;cursor:pointer;border-radius:8px;padding:5px 8px;font-size:13px">🗑️</button>
+          </div>
+        </div>
+        <div class="grid grid-cols-3 gap-2 mb-3">
+          <div class="rounded-lg p-3 text-center" style="background:#1d2027"><div class="text-xs mb-1" style="color:#6b7280">Outstanding</div><div class="text-sm font-bold text-red-400">${fmt(c.outstanding)}</div></div>
+          <div class="rounded-lg p-3 text-center" style="background:#1d2027"><div class="text-xs mb-1" style="color:#6b7280">Limit</div><div class="text-sm font-bold">${fmt(c.limit)}</div></div>
+          <div class="rounded-lg p-3 text-center" style="background:#1d2027"><div class="text-xs mb-1" style="color:#6b7280">Available</div><div class="text-sm font-bold text-emerald-400">${fmt(avail)}</div></div>
+        </div>
+        <div class="flex items-center gap-2">
+          <div class="flex-1 rounded-full overflow-hidden" style="height:5px;background:#1d2027">
+            <div style="width:${pct.toFixed(1)}%;height:5px;background:${barColor};border-radius:3px;transition:width 0.3s"></div>
+          </div>
+          <span class="text-xs flex-shrink-0" style="color:#6b7280">${pct.toFixed(1)}% used</span>
+        </div>
+      </div>`;
+  }
+
+  const addAcctModal = acctUI.showAddAcct ? `
+    <div class="fixed inset-0 flex items-end sm:items-center justify-center" style="z-index:200;background:rgba(0,0,0,0.8)" onclick="acctCloseAdd()">
+      <div class="w-full sm:w-96 rounded-t-3xl sm:rounded-2xl p-6" style="background:#1d2027;border:1px solid #374151;max-height:92vh;overflow-y:auto" onclick="event.stopPropagation()">
+        <div class="flex items-center justify-between mb-5">
+          <div class="text-lg font-bold">Add Account</div>
+          <button onclick="acctCloseAdd()" style="background:none;border:none;color:#6b7280;cursor:pointer;font-size:22px;line-height:1">×</button>
+        </div>
+        <div class="inline-flex p-1 rounded-xl mb-4 gap-1 w-full" style="background:#0f1116;border:1px solid #1f2937">
+          ${['bank','ewallet','cash'].map(t=>`<button onclick="acctSetAddType('${t}')" class="flex-1 rounded-lg py-2 text-xs font-medium" style="${acctUI.addType===t?'background:#1d2027;color:#e5e7eb;border:1px solid #374151':'background:transparent;color:#6b7280;border:1px solid transparent'}">${t==='bank'?'🏦 Bank':t==='ewallet'?'📱 E-Wallet':'💵 Cash'}</button>`).join('')}
+        </div>
+        <div class="grid gap-3 mb-3" style="grid-template-columns:56px 1fr">
+          <div><div class="field-label">ICON</div><input id="acct-icon" placeholder="${acctUI.addType==='bank'?'🏦':acctUI.addType==='ewallet'?'📱':'💵'}" class="field-input" style="font-size:20px;text-align:center;padding:8px 4px"></div>
+          <div><div class="field-label">NAME *</div><input id="acct-name" type="text" placeholder="e.g. BDO Savings" class="field-input"></div>
+        </div>
+        <div class="mb-5"><div class="field-label">BALANCE (₱)</div><input id="acct-balance" type="number" step="0.01" min="0" placeholder="0.00" class="field-input"></div>
+        <div id="acct-err" class="text-red-400 text-xs mb-3"></div>
+        <div class="flex gap-3">
+          <button onclick="acctSave()" class="flex-1 rounded-xl py-3 font-semibold text-white text-sm" style="background:#6366f1;border:none;cursor:pointer">Add Account</button>
+          <button onclick="acctCloseAdd()" class="flex-1 rounded-xl py-3 text-sm" style="background:#0f1116;border:1px solid #374151;color:#9ca3af;cursor:pointer">Cancel</button>
+        </div>
+      </div>
+    </div>` : '';
+
+  const addCCModal = acctUI.showAddCC ? `
+    <div class="fixed inset-0 flex items-end sm:items-center justify-center" style="z-index:200;background:rgba(0,0,0,0.8)" onclick="ccCloseAdd()">
+      <div class="w-full sm:w-96 rounded-t-3xl sm:rounded-2xl p-6" style="background:#1d2027;border:1px solid #374151;max-height:92vh;overflow-y:auto" onclick="event.stopPropagation()">
+        <div class="flex items-center justify-between mb-5">
+          <div class="text-lg font-bold">Add Credit Card</div>
+          <button onclick="ccCloseAdd()" style="background:none;border:none;color:#6b7280;cursor:pointer;font-size:22px;line-height:1">×</button>
+        </div>
+        <div class="grid gap-3 mb-3" style="grid-template-columns:56px 1fr">
+          <div><div class="field-label">ICON</div><input id="cc-icon" placeholder="💳" class="field-input" style="font-size:20px;text-align:center;padding:8px 4px"></div>
+          <div><div class="field-label">NAME *</div><input id="cc-name" type="text" placeholder="e.g. BPI Credit Card" class="field-input"></div>
+        </div>
+        <div class="grid grid-cols-2 gap-3 mb-3">
+          <div><div class="field-label">OUTSTANDING (₱)</div><input id="cc-owed" type="number" step="0.01" min="0" placeholder="0.00" class="field-input"></div>
+          <div><div class="field-label">CREDIT LIMIT (₱)</div><input id="cc-lim" type="number" step="0.01" min="0" placeholder="0.00" class="field-input"></div>
+        </div>
+        <div class="mb-5"><div class="field-label">DUE DAY (1–31)</div><input id="cc-due" type="number" min="1" max="31" placeholder="25" class="field-input"></div>
+        <div id="cc-err" class="text-red-400 text-xs mb-3"></div>
+        <div class="flex gap-3">
+          <button onclick="ccSave()" class="flex-1 rounded-xl py-3 font-semibold text-white text-sm" style="background:#6366f1;border:none;cursor:pointer">Add Card</button>
+          <button onclick="ccCloseAdd()" class="flex-1 rounded-xl py-3 text-sm" style="background:#0f1116;border:1px solid #374151;color:#9ca3af;cursor:pointer">Cancel</button>
+        </div>
+      </div>
+    </div>` : '';
+
+  return `${renderNav()}
+    <div class="text-2xl font-bold mb-5">Accounts</div>
+    <div class="rounded-2xl p-5 mb-6" style="background:linear-gradient(135deg,#1e3461 0%,#312e81 100%);border:1px solid rgba(99,102,241,0.3)">
+      <div class="text-xs mb-1" style="color:rgba(255,255,255,0.55)">Net Worth</div>
+      <div class="text-4xl font-bold mb-4">${fmt2(nw)}</div>
+      <div class="grid grid-cols-2 gap-4">
+        <div><div class="text-xs mb-1" style="color:rgba(255,255,255,0.5)">Total Assets</div><div class="text-lg font-semibold text-emerald-400">${fmt2(totalDebit)}</div></div>
+        <div><div class="text-xs mb-1" style="color:rgba(255,255,255,0.5)">Total Owed</div><div class="text-lg font-semibold text-red-400">${fmt2(totalOwed)}</div></div>
+      </div>
+    </div>
+    ${section('Banks', banks, 'bank', sumB)}
+    ${section('E-Wallets', ewallets, 'ewallet', sumE)}
+    ${section('Cash', cashList, 'cash', sumC)}
+    <div class="rounded-2xl p-4 mb-4" style="background:#1d2027">
+      <div class="flex items-center justify-between mb-3">
+        <div class="flex items-center gap-2">
+          <span>💳</span><span class="font-semibold">Credit Cards</span>
+          <span class="text-xs px-2 py-0.5 rounded-full font-medium" style="background:rgba(245,158,11,0.12);color:#f59e0b">${state.creditCards.length}</span>
+        </div>
+        <div class="flex items-center gap-3">
+          <span class="text-sm font-semibold text-red-400">Owed ${fmt2(totalOwed)}</span>
+          <button onclick="ccOpenAdd()" class="text-xs px-3 py-1.5 rounded-lg font-semibold text-white" style="background:#6366f1;border:none;cursor:pointer">+ Add</button>
+        </div>
+      </div>
+      ${state.creditCards.map(c=>ccCard(c)).join('')}
+      ${state.creditCards.length===0?`<div class="text-center py-4 text-sm" style="color:#4b5563">No credit cards added yet</div>`:''}
+    </div>
+    ${addAcctModal}${addCCModal}`;
+}
+
+
 window.fabOpen = () => {
   currentView = 'transactions';
   txUI.showModal = true;
@@ -912,15 +1763,16 @@ function render() {
   let html;
   if      (currentView==='transactions') html=renderTransactions();
   else if (currentView==='categories')   html=renderCategories();
-  else if (currentView==='accounts')     html=renderPlaceholder('Accounts','🏦','Manage bank accounts, e-wallets, and credit cards. Coming soon.');
-  else if (currentView==='goals')        html=renderPlaceholder('Goals','🎯','Track savings goals with visual progress. Coming soon.');
-  else if (currentView==='recurring')    html=renderPlaceholder('Recurring','🔁','Manage recurring income and expenses. Coming soon.');
+  else if (currentView==='accounts')     html=renderAccounts();
+  else if (currentView==='goals')        html=renderGoals();
+  else if (currentView==='recurring')    html=renderRecurring();
   else                                   html=renderDashboard();
   document.getElementById('app').innerHTML=html;
   document.getElementById('bottom-nav').innerHTML=renderBottomNav();
   attachEdits();
 }
 
+checkAndPostRecurring();
 render();
 </script>
 </body>
