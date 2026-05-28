@@ -79,6 +79,7 @@ const SUPABASE_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFz
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 let currentUser = null;
 let syncTimeout = null;
+let isLoading   = true; // true until initAuth() resolves
 
 
 const STORAGE_KEY = 'pf_v2';
@@ -297,21 +298,19 @@ function computeGoalSaved(g) {
 // ── Dashboard data: auto-calculate from transactions if available ──
 function getMonthlyData() {
   const yr = now.getFullYear(), mo = now.getMonth();
-  const monthTx = state.transactions.filter(t => {
+  const fallbackMonthly = { avgMonthlyExpenses: state.monthly?.avgMonthlyExpenses||0, categories: state.monthly?.categories||[] };
+  const monthTx = (state.transactions||[]).filter(t => {
     const d = new Date(t.date + 'T00:00:00');
     return d.getFullYear()===yr && d.getMonth()===mo;
   });
-  if (monthTx.length === 0) return state.monthly;
+  if (monthTx.length === 0) return { income:0, expenses:0, ...fallbackMonthly };
 
   const income   = monthTx.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount, 0);
   const expenses = monthTx.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount, 0);
-
-  // Top categories from transactions
   const catMap = {};
   monthTx.filter(t=>t.type==='expense').forEach(t => {
     if (!t.categoryId) return;
-    if (!catMap[t.categoryId]) catMap[t.categoryId] = 0;
-    catMap[t.categoryId] += t.amount;
+    catMap[t.categoryId] = (catMap[t.categoryId]||0) + t.amount;
   });
   const palette = ['#6366f1','#f59e0b','#10b981','#3b82f6','#ec4899','#8b5cf6','#06b6d4'];
   const topCats = Object.entries(catMap)
@@ -320,8 +319,7 @@ function getMonthlyData() {
       const cat = state.categories.find(c=>c.id===cid);
       return { id:'mc_'+cid, name:cat?.name||'Other', icon:cat?.icon||'❓', amount:Math.round(amt), color:palette[i]||'#6b7280' };
     });
-
-  return { ...state.monthly, income, expenses, categories: topCats.length ? topCats : state.monthly.categories };
+  return { ...fallbackMonthly, income, expenses, categories: topCats.length ? topCats : fallbackMonthly.categories };
 }
 
 function editable(value, path, formatter) {
@@ -350,7 +348,8 @@ function setPath(path, val) {
     const [id,field]=rest; const item=state.creditCards.find(x=>x.id===id); if(item) item[field]=val;
   } else if (col==='monthly') {
     const [field,id,prop]=rest;
-    if (field==='categories') { const item=state.monthly.categories.find(x=>x.id===id); if(item) item[prop]=val; }
+    if (!state.monthly) state.monthly = { avgMonthlyExpenses:0, categories:[] };
+    if (field==='categories') { const item=(state.monthly.categories||[]).find(x=>x.id===id); if(item) item[prop]=val; }
     else state.monthly[field]=val;
   } else if (col==='goals') {
     const [id,field]=rest; const item=state.goals.find(x=>x.id===id); if(item) item[field]=val;
@@ -362,6 +361,7 @@ function setPath(path, val) {
 // NAVIGATION
 // ═══════════════════════════════════════════════════════
 window.setView     = v => { currentView=v; render(); window.scrollTo(0,0); };
+window.showImportPanel = () => { const p=document.getElementById('import-panel'); if(p) p.style.display=p.style.display==='none'?'':'none'; };
 window.setForecast = d => { state.forecastDays=d; save(); render(); };
 
 // ═══════════════════════════════════════════════════════
@@ -1010,6 +1010,48 @@ function renderPlaceholder(label, icon, note) {
 // RENDER DASHBOARD
 // ═══════════════════════════════════════════════════════
 function renderDashboard() {
+  // Empty state for brand new users
+  if (!state.accounts.length && !state.transactions.length) {
+    return `
+      ${renderNav()}
+      <div style="text-align:center;padding:60px 24px">
+        <div style="font-size:56px;margin-bottom:16px">👋</div>
+        <div style="font-size:20px;font-weight:700;color:#e5e7eb;margin-bottom:8px">Welcome to Personal Finance</div>
+        <div style="color:#6b7280;font-size:14px;line-height:1.7;margin-bottom:32px">Get started by adding your bank accounts,<br>or import your existing data below.</div>
+        <div style="display:flex;flex-direction:column;gap:12px;max-width:300px;margin:0 auto">
+          <button onclick="setView('accounts')" style="padding:14px;border-radius:12px;background:#6366f1;border:none;color:#fff;font-size:14px;font-weight:600;cursor:pointer">🏦 Add My Accounts</button>
+          <button onclick="showImportPanel()" style="padding:14px;border-radius:12px;background:#1d2027;border:1px solid #374151;color:#d1d5db;font-size:14px;font-weight:600;cursor:pointer">📥 Import Existing Data</button>
+        </div>
+        <div id="import-panel" style="display:none;margin-top:24px;background:#1d2027;border:1px solid #374151;border-radius:16px;padding:20px;text-align:left">
+          <div style="font-weight:600;margin-bottom:4px;color:#e5e7eb">Import Your Data</div>
+          <div style="color:#6b7280;font-size:12px;margin-bottom:16px">CSV is the easiest — works from Excel, Google Sheets, or any app</div>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <button onclick="importCSV()" style="padding:12px 14px;border-radius:10px;background:#6366f1;border:none;color:#fff;font-size:13px;cursor:pointer;text-align:left;font-weight:600">
+              📊 Import Transactions from CSV
+            </button>
+            <button onclick="importData()" style="padding:12px 14px;border-radius:10px;background:#0f1116;border:1px solid #374151;color:#d1d5db;font-size:13px;cursor:pointer;text-align:left">
+              🗂 Restore from JSON Backup
+            </button>
+          </div>
+          <div id="import-status" style="margin-top:12px;font-size:13px"></div>
+          <details style="margin-top:16px">
+            <summary style="color:#6b7280;font-size:12px;cursor:pointer;user-select:none">📋 CSV Format Guide</summary>
+            <div style="margin-top:10px;background:#0f1116;border-radius:8px;padding:12px;font-size:11px;color:#9ca3af;font-family:monospace;overflow-x:auto;white-space:nowrap">
+              Date,Description,Type,Amount,Category,Subcategory,Account,Notes<br>
+              2026-05-01,Jollibee,expense,150,Food,Fast Food,GCash,Lunch<br>
+              2026-05-07,Upwork,income,50000,Freelance,Upwork,Unionbank,<br>
+              2026-06-01,Rent,expense,22000,Housing,,Unionbank,June rent
+            </div>
+            <div style="margin-top:10px;color:#6b7280;font-size:11px;line-height:1.7">
+              <strong style="color:#9ca3af">Required:</strong> Date (YYYY-MM-DD), Description, Type (expense/income/transfer), Amount<br>
+              <strong style="color:#9ca3af">Optional:</strong> Category, Subcategory, Account, Notes<br>
+              <strong style="color:#9ca3af">Tip:</strong> Category and Account names must match what you set up in this app
+            </div>
+          </details>
+        </div>
+      </div>`;
+  }
+
   const nw=netWorth(), assets=totalAssets(), liab=totalLiab();
   const m=getMonthlyData();
   const net=m.income-m.expenses;
@@ -1751,6 +1793,11 @@ function renderBottomNav() {
 
 
 function render() {
+  if (isLoading) {
+    document.getElementById('app').innerHTML = renderLoadingScreen();
+    document.getElementById('bottom-nav').innerHTML = '';
+    return;
+  }
   if (!currentUser) {
     document.getElementById('app').innerHTML = renderLoginScreen();
     document.getElementById('bottom-nav').innerHTML = '';
@@ -1777,6 +1824,146 @@ function render() {
 // ═══════════════════════════════════════════════════════
 // AUTH + SYNC
 // ═══════════════════════════════════════════════════════
+function renderLoadingScreen() {
+  return `<div style="min-height:80vh;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px">
+    <div style="width:40px;height:40px;border:3px solid #374151;border-top-color:#6366f1;border-radius:50%;animation:spin 0.8s linear infinite"></div>
+    <div style="color:#6b7280;font-size:14px">Loading your data...</div>
+    <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+  </div>`;
+}
+
+// ── Export transactions as CSV ──
+window.exportCSV = () => {
+  const headers = ['Date','Description','Type','Amount','Category','Subcategory','Account','Notes'];
+  const rows = state.transactions.map(t => {
+    const cat    = state.categories.find(c=>c.id===t.categoryId);
+    const subcat = cat?.subs?.find(s=>s.id===t.subcategoryId);
+    const acct   = state.accounts.find(a=>a.id===t.accountId);
+    const esc    = v => `"${String(v||'').replace(/"/g,'""')}"`;
+    return [t.date, esc(t.description), t.type, t.amount, esc(cat?.name||''), esc(subcat?.name||''), esc(acct?.name||''), esc(t.notes||'')].join(',');
+  });
+  const csv  = [headers.join(','), ...rows].join('\n');
+  const blob = new Blob([csv], { type:'text/csv' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a'); a.href=url; a.download=`transactions-${todayISO}.csv`; a.click();
+  URL.revokeObjectURL(url);
+};
+
+// ── Export full backup as JSON ──
+window.exportData = () => {
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type:'application/json' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a'); a.href=url; a.download=`finance-backup-${todayISO}.json`; a.click();
+  URL.revokeObjectURL(url);
+};
+
+// ── Simple CSV parser (handles quoted fields) ──
+function parseCSV(text) {
+  const lines = text.replace(/\r\n/g,'\n').replace(/\r/g,'\n').split('\n').filter(l=>l.trim());
+  if (lines.length < 2) return [];
+  const headers = lines[0].split(',').map(h=>h.trim().toLowerCase().replace(/^"|"$/g,''));
+  return lines.slice(1).map(line => {
+    const vals = []; let cur='', inQ=false;
+    for (let i=0;i<line.length;i++) {
+      const ch=line[i];
+      if (ch==='"' && !inQ) { inQ=true; continue; }
+      if (ch==='"' && inQ && line[i+1]==='"') { cur+='"'; i++; continue; }
+      if (ch==='"' && inQ) { inQ=false; continue; }
+      if (ch===',' && !inQ) { vals.push(cur.trim()); cur=''; continue; }
+      cur+=ch;
+    }
+    vals.push(cur.trim());
+    const row={};
+    headers.forEach((h,i)=>{ row[h]=vals[i]||''; });
+    return row;
+  });
+}
+
+// ── Import from CSV file ──
+window.importCSV = () => {
+  const input = document.createElement('input');
+  input.type='file'; input.accept='.csv,text/csv';
+  input.onchange = e => {
+    const file=e.target.files[0]; if (!file) return;
+    const reader=new FileReader();
+    reader.onload = ev => {
+      try {
+        const rows = parseCSV(ev.target.result);
+        if (!rows.length) { setImportStatus('✗ File is empty or has no data rows.','#f87171'); return; }
+        // Validate required columns
+        const required = ['date','description','type','amount'];
+        const missing  = required.filter(h=>!(h in rows[0]));
+        if (missing.length) { setImportStatus(`✗ Missing columns: ${missing.join(', ')}. See format guide below.`,'#f87171'); return; }
+
+        let added=0, skipped=0;
+        rows.forEach(row => {
+          const date   = row['date']?.trim();
+          const desc   = row['description']?.trim();
+          const type   = (row['type']?.trim()||'expense').toLowerCase();
+          const amount = parseFloat(row['amount']?.replace(/[^0-9.]/g,''));
+          if (!date||!desc||isNaN(amount)||amount<=0) { skipped++; return; }
+          if (!['expense','income','transfer'].includes(type)) { skipped++; return; }
+
+          // Match category by name (case-insensitive)
+          const catName = row['category']?.trim().toLowerCase();
+          const subName = row['subcategory']?.trim().toLowerCase();
+          const cat     = catName ? state.categories.find(c=>c.name.toLowerCase()===catName) : null;
+          const subcat  = (cat&&subName) ? cat.subs?.find(s=>s.name.toLowerCase()===subName) : null;
+
+          // Match account by name (case-insensitive), fallback to first account
+          const acctName = row['account']?.trim().toLowerCase();
+          const acct     = acctName ? state.accounts.find(a=>a.name.toLowerCase()===acctName) : null;
+          const accountId= acct?.id || state.accounts[0]?.id || '';
+
+          state.transactions.push({
+            id:'tx_csv_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),
+            date, description:desc, type, amount,
+            categoryId:cat?.id||'', subcategoryId:subcat?.id||'',
+            accountId, toAccountId:'', notes:row['notes']?.trim()||''
+          });
+          added++;
+        });
+
+        if (added===0) { setImportStatus(`✗ No valid rows found. Check your column names and values.`,'#f87171'); return; }
+        save();
+        setImportStatus(`✓ Imported ${added} transactions${skipped?` (${skipped} skipped — invalid rows)`:''}.`,'#34d399');
+        setTimeout(()=>{ currentView='transactions'; render(); }, 1500);
+      } catch(err) {
+        setImportStatus('✗ Could not parse file. Make sure it is a valid CSV.','#f87171');
+      }
+    };
+    reader.readAsText(file);
+  };
+  input.click();
+};
+
+// ── Import full backup from JSON ──
+window.importData = () => {
+  const input = document.createElement('input');
+  input.type='file'; input.accept='.json,application/json';
+  input.onchange = e => {
+    const file=e.target.files[0]; if (!file) return;
+    const reader=new FileReader();
+    reader.onload = async ev => {
+      try {
+        state = migrateState(JSON.parse(ev.target.result));
+        save();
+        setImportStatus('✓ Backup restored successfully!','#34d399');
+        setTimeout(()=>render(), 1200);
+      } catch(err) { setImportStatus('✗ Invalid file.','#f87171'); }
+    };
+    reader.readAsText(file);
+  };
+  input.click();
+};
+
+function setImportStatus(msg, color) {
+  const el = document.getElementById('import-status');
+  if (el) { el.textContent=msg; el.style.color=color||'#34d399'; }
+}
+
+
+
 function showSyncIndicator(msg) {
   let el = document.getElementById('sync-indicator');
   if (!el) return;
@@ -1870,6 +2057,10 @@ function renderUserPill() {
       </div>
       <div id="user-menu" class="hidden" style="position:fixed;top:52px;right:12px;background:#1d2027;border:1px solid #374151;border-radius:12px;padding:8px;min-width:160px;z-index:400;box-shadow:0 8px 32px rgba(0,0,0,0.4)">
         <div style="padding:8px 12px;color:#9ca3af;font-size:11px;border-bottom:1px solid #374151;margin-bottom:4px">${currentUser.email}</div>
+        <button onclick="importCSV()" style="width:100%;text-align:left;padding:8px 12px;border-radius:8px;background:none;border:none;color:#d1d5db;font-size:13px;cursor:pointer" onmouseover="this.style.background='#1f2937'" onmouseout="this.style.background='none'">📊 Import CSV</button>
+        <button onclick="exportCSV()" style="width:100%;text-align:left;padding:8px 12px;border-radius:8px;background:none;border:none;color:#d1d5db;font-size:13px;cursor:pointer" onmouseover="this.style.background='#1f2937'" onmouseout="this.style.background='none'">📥 Export CSV</button>
+        <button onclick="exportData()" style="width:100%;text-align:left;padding:8px 12px;border-radius:8px;background:none;border:none;color:#d1d5db;font-size:13px;cursor:pointer" onmouseover="this.style.background='#1f2937'" onmouseout="this.style.background='none'">💾 Backup (JSON)</button>
+        <div style="border-top:1px solid #374151;margin:4px 0"></div>
         <button onclick="signOut()" style="width:100%;text-align:left;padding:8px 12px;border-radius:8px;background:none;border:none;color:#f87171;font-size:13px;cursor:pointer" onmouseover="this.style.background='#1f2937'" onmouseout="this.style.background='none'">🚪 Sign Out</button>
       </div>
     </div>`;
@@ -1882,6 +2073,7 @@ async function initAuth() {
     await loadFromSupabase(currentUser);
     checkAndPostRecurring();
   }
+  isLoading = false;
   render();
 
   sb.auth.onAuthStateChange(async (event, session) => {
