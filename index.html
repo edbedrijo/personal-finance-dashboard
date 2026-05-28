@@ -2001,11 +2001,20 @@ async function loadFromSupabase(user) {
 }
 
 window.signInWithGoogle = async () => {
+  // Detect in-app browsers (Messenger, Instagram, Facebook, TikTok, etc.)
+  const ua = navigator.userAgent || '';
+  const isInApp = /FBAN|FBAV|Instagram|Messenger|Line|Twitter|TikTok|MicroMessenger/i.test(ua);
+  if (isInApp) {
+    document.getElementById('inapp-warning').style.display = '';
+    return;
+  }
   const btn = document.getElementById('google-btn');
   if (btn) { btn.disabled = true; btn.textContent = 'Redirecting...'; }
+  // Use clean origin URL — avoids hash/query param issues that cause Google 400
+  const redirectTo = window.location.origin + window.location.pathname;
   await sb.auth.signInWithOAuth({
     provider: 'google',
-    options: { redirectTo: window.location.href }
+    options: { redirectTo }
   });
 };
 
@@ -2038,6 +2047,17 @@ function renderLoginScreen() {
           </svg>
           Continue with Google
         </button>
+
+        <div id="inapp-warning" style="display:none;margin-top:16px;background:#1d2027;border:1px solid #f59e0b;border-radius:12px;padding:14px 16px;text-align:left">
+          <div style="color:#f59e0b;font-weight:600;font-size:13px;margin-bottom:6px">⚠️ Open in Safari or Chrome</div>
+          <div style="color:#9ca3af;font-size:12px;line-height:1.6">Google login doesn't work inside Messenger or other in-app browsers.<br><br>
+            Copy this link and open it in <strong style="color:#d1d5db">Safari</strong> or <strong style="color:#d1d5db">Chrome</strong>:
+          </div>
+          <div style="margin-top:10px;background:#0f1116;border-radius:8px;padding:10px;font-size:11px;color:#6366f1;word-break:break-all;font-family:monospace">${window.location.origin}</div>
+          <button onclick="navigator.clipboard?.writeText(window.location.origin).then(()=>{this.textContent='✓ Copied!';setTimeout(()=>this.textContent='Copy Link',2000)})" 
+            style="margin-top:10px;width:100%;padding:10px;border-radius:8px;background:#6366f1;border:none;color:#fff;font-size:13px;font-weight:600;cursor:pointer">Copy Link</button>
+        </div>
+
         <div style="margin-top:24px;color:#374151;font-size:12px">Your data is private and encrypted</div>
       </div>
     </div>`;
