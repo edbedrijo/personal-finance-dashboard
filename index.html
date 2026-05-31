@@ -494,12 +494,14 @@ window.txSave = () => {
     return;
   }
   if (txUI.editId) {
-    // Edit existing
+    // Edit existing — reverse old CC effect, apply new
     const tx = state.transactions.find(t => t.id === txUI.editId);
     if (tx) {
+      if (tx.notes!=='CC payment') adjustCC(tx.accountId, tx.type, tx.amount, -1); // reverse old
       tx.date = date; tx.description = desc; tx.type = type; tx.amount = amt;
       tx.categoryId = catId; tx.subcategoryId = subId; tx.accountId = accId;
       tx.notes = notes; tx.toAccountId = toAccId;
+      if (tx.notes!=='CC payment') adjustCC(accId, type, amt, +1); // apply new
     }
   } else {
     // Add new
@@ -509,13 +511,28 @@ window.txSave = () => {
       categoryId: catId, subcategoryId: subId, accountId: accId,
       toAccountId: toAccId, notes
     });
+    adjustCC(accId, type, amt, +1);
   }
   save(); txUI.showModal=false; txUI.editId=null; render();
 };
 
+// ── CC outstanding auto-adjustment ──────────────────────
+// Apply a transaction's effect on CC outstanding (delta = +amt or -amt)
+function adjustCC(accountId, type, amount, delta) {
+  // Only affects credit cards, not debit accounts
+  const cc = state.creditCards.find(c=>c.id===accountId);
+  if (!cc) return;
+  if (type==='expense') cc.outstanding = Math.max(0, cc.outstanding + delta * amount);
+  // income to a CC = refund/cashback → reduces outstanding
+  if (type==='income')  cc.outstanding = Math.max(0, cc.outstanding - delta * amount);
+}
+
 window.txAskDelete = id => { txUI.deleteId=id; render(); };
 window.txCancelDelete = () => { txUI.deleteId=null; render(); };
 window.txConfirmDelete = () => {
+  const tx = state.transactions.find(t=>t.id===txUI.deleteId);
+  // Reverse the CC effect when deleting (skip CC payment transactions — those are handled by ccRecordPayment)
+  if (tx && tx.notes!=='CC payment') adjustCC(tx.accountId, tx.type, tx.amount, -1);
   state.transactions = state.transactions.filter(t=>t.id!==txUI.deleteId);
   save(); txUI.deleteId=null; render();
 };
@@ -1227,7 +1244,7 @@ function renderDashboard() {
         return `<div class="bg-[#1d2027] rounded-xl p-4">
           <div class="flex justify-between items-start mb-3">
             <div><div class="font-medium">${c.name}</div><div class="text-xs text-gray-500 mt-0.5">Due ${c.dueDay}${sfx(c.dueDay)} · ${daysUntil(c.dueDay)} days away</div></div>
-            <div class="text-right"><div class="text-red-400 font-semibold">${editable(c.outstanding,`creditCards.${c.id}.outstanding`,fmt2)}</div><div class="text-xs text-gray-500">avl. ${fmt2(avail)}</div></div>
+            <div class="text-right"><div class="text-red-400 font-semibold">${fmt2(c.outstanding)}</div><div class="text-xs text-gray-500">avl. ${fmt2(avail)}</div></div>
           </div>
           <div class="bg-[#0f1116] rounded-full overflow-hidden" style="height:3px"><div style="width:${pct}%;height:3px;background:#ef4444;border-radius:2px"></div></div>
         </div>`;}).join('')}
@@ -1880,10 +1897,10 @@ function renderAccounts() {
           <div class="rounded-lg p-3 text-center" style="background:#1d2027"><div class="text-xs mb-1" style="color:#6b7280">Available</div><div class="text-sm font-bold text-emerald-400">${fmt(avail)}</div></div>
           <div class="rounded-lg p-3 text-center" style="background:#1d2027"><div class="text-xs mb-1" style="color:#6b7280">Credit Limit</div><div class="text-sm font-bold">${fmt(c.limit)}</div></div>
         </div>
-        ${cycleSpend>0?`
+        ${c.lastStatement>0?`
         <div class="flex items-center justify-between py-2 px-3 rounded-lg mb-3" style="background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.15)">
-          <div class="text-xs" style="color:#9ca3af">📊 Current cycle spending <span style="color:#6b7280">(since ${c.cycleStartDay||1}${sfx(c.cycleStartDay||1)})</span></div>
-          <div class="text-sm font-bold" style="color:#818cf8">${fmt(cycleSpend)}</div>
+          <div class="text-xs" style="color:#9ca3af">📈 Projected next statement <span style="color:#6b7280">(last stmt + new charges)</span></div>
+          <div class="text-sm font-bold" style="color:#818cf8">${fmt(c.lastStatement + cycleSpend)}</div>
         </div>`:''}
         <div class="flex items-center gap-2">
           <div class="flex-1 rounded-full overflow-hidden" style="height:5px;background:#1d2027">
