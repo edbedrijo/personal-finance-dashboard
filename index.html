@@ -144,8 +144,9 @@ function migrateState(p) {
   if (p.accounts) p.accounts.forEach(a => {
     if (!a.type) a.type = ['gcash','maya'].includes(a.id) ? 'ewallet' : a.id==='cash' ? 'cash' : 'bank';
     if (!a.icon) a.icon = a.type==='bank' ? '🏦' : a.type==='ewallet' ? '📱' : '💵';
+    if (a.maintainingBalance===undefined) a.maintainingBalance=0;
   });
-  if (p.creditCards) p.creditCards.forEach(c => { if (!c.icon) c.icon = '💳'; });
+  if (p.creditCards) p.creditCards.forEach(c => { if (!c.icon) c.icon = '💳'; if (c.lastStatement===undefined) c.lastStatement=0; if (c.maintainingBalance===undefined) c.maintainingBalance=0; });
   if (p.recurring) p.recurring.forEach(r => {
     if (r.dueDay !== undefined && !r.frequency) {
       r.frequency = 'monthly'; r.active = true;
@@ -207,6 +208,7 @@ let txUI   = { filter:'month', showModal:false, deleteId:null, editId:null };
 let acctUI = { showAddAcct:false, addType:'bank', editAcctId:null, deleteAcctId:null, showAddCC:false, editCCId:null, deleteCCId:null };
 let goalUI = { showAddGoal:false, editGoalId:null, deleteGoalId:null, depositGoalId:null, expandedGoalId:null, deleteDepositKey:null };
 let recUI  = { showAddRec:false, editRecId:null, deleteRecId:null };
+let iconPickerUI = { targetId:null, anchorRect:null };
 let recAutoPostedCount = 0;
 let recurringChecked   = false;
 
@@ -216,9 +218,10 @@ let recurringChecked   = false;
 const fmt  = n => '₱' + Math.round(n).toLocaleString('en-PH');
 const fmt2 = n => '₱' + n.toLocaleString('en-PH', {minimumFractionDigits:2, maximumFractionDigits:2});
 const sfx  = d => d>3&&d<21?'th':{1:'st',2:'nd',3:'rd'}[d%10]||'th';
-const totalAssets = () => state.accounts.reduce((s,a)=>s+a.balance,0);
-const totalLiab   = () => state.creditCards.reduce((s,c)=>s+c.outstanding,0);
-const netWorth    = () => totalAssets()-totalLiab();
+const totalAssets    = () => state.accounts.reduce((s,a)=>s+a.balance,0);
+const spendableAssets= () => state.accounts.reduce((s,a)=>s+(a.balance-(a.maintainingBalance||0)),0);
+const totalLiab      = () => state.creditCards.reduce((s,c)=>s+c.outstanding,0);
+const netWorth       = () => totalAssets()-totalLiab();
 
 function daysUntil(dueDay) {
   const d = now.getDate();
@@ -303,7 +306,7 @@ function getMonthlyData() {
     const d = new Date(t.date + 'T00:00:00');
     return d.getFullYear()===yr && d.getMonth()===mo;
   });
-  if (monthTx.length === 0) return { income:0, expenses:0, ...fallbackMonthly };
+  if (monthTx.length === 0) return { income:0, expenses:0, label: currentMonthLabel, ...fallbackMonthly };
 
   const income   = monthTx.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount, 0);
   const expenses = monthTx.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount, 0);
@@ -319,7 +322,7 @@ function getMonthlyData() {
       const cat = state.categories.find(c=>c.id===cid);
       return { id:'mc_'+cid, name:cat?.name||'Other', icon:cat?.icon||'❓', amount:Math.round(amt), color:palette[i]||'#6b7280' };
     });
-  return { ...fallbackMonthly, income, expenses, categories: topCats.length ? topCats : fallbackMonthly.categories };
+  return { ...fallbackMonthly, label: currentMonthLabel, income, expenses, categories: topCats.length ? topCats : fallbackMonthly.categories };
 }
 
 function editable(value, path, formatter) {
@@ -529,8 +532,9 @@ window.acctUpdate = id => {
   const a=state.accounts.find(x=>x.id===id); if(!a) return;
   const name=document.getElementById('edit-acct-name-'+id)?.value.trim();
   const bal=parseFloat(document.getElementById('edit-acct-bal-'+id)?.value);
+  const mbal=parseFloat(document.getElementById('edit-acct-mbal-'+id)?.value);
   const icon=document.getElementById('edit-acct-icon-'+id)?.value.trim();
-  if(name) a.name=name; if(!isNaN(bal)) a.balance=bal; if(icon) a.icon=icon;
+  if(name) a.name=name; if(!isNaN(bal)) a.balance=bal; if(!isNaN(mbal)) a.maintainingBalance=mbal; if(icon) a.icon=icon;
   save(); acctUI.editAcctId=null; render();
 };
 window.acctConfirmDelete = () => {
@@ -540,9 +544,10 @@ window.acctConfirmDelete = () => {
 window.acctSave = () => {
   const name=document.getElementById('acct-name')?.value.trim();
   const bal=parseFloat(document.getElementById('acct-balance')?.value)||0;
+  const mbal=parseFloat(document.getElementById('acct-mbalance')?.value)||0;
   const icon=document.getElementById('acct-icon')?.value.trim()||(acctUI.addType==='bank'?'🏦':acctUI.addType==='ewallet'?'📱':'💵');
   if(!name){document.getElementById('acct-err').textContent='Name is required.';return;}
-  state.accounts.push({id:'acct_'+Date.now(),name,balance:bal,type:acctUI.addType,icon});
+  state.accounts.push({id:'acct_'+Date.now(),name,balance:bal,maintainingBalance:mbal,type:acctUI.addType,icon});
   save(); acctUI.showAddAcct=false; render();
 };
 
@@ -562,8 +567,10 @@ window.ccUpdate = id => {
   const lim=parseFloat(document.getElementById('edit-cc-lim-'+id)?.value);
   const due=parseInt(document.getElementById('edit-cc-due-'+id)?.value);
   const icon=document.getElementById('edit-cc-icon-'+id)?.value.trim();
+  const lastStmtU=parseFloat(document.getElementById('edit-cc-last-stmt-'+id)?.value);
   if(name) c.name=name; if(!isNaN(owed)) c.outstanding=owed;
   if(!isNaN(lim)) c.limit=lim; if(!isNaN(due)&&due>=1&&due<=31) c.dueDay=due;
+  if(!isNaN(lastStmtU)) c.lastStatement=lastStmtU;
   if(icon) c.icon=icon;
   save(); acctUI.editCCId=null; render();
 };
@@ -576,9 +583,10 @@ window.ccSave = () => {
   const owed=parseFloat(document.getElementById('cc-owed')?.value)||0;
   const lim=parseFloat(document.getElementById('cc-lim')?.value)||0;
   const due=parseInt(document.getElementById('cc-due')?.value)||25;
+  const lastStmt=parseFloat(document.getElementById('cc-last-stmt')?.value)||0;
   const icon=document.getElementById('cc-icon')?.value.trim()||'💳';
   if(!name){document.getElementById('cc-err').textContent='Name is required.';return;}
-  state.creditCards.push({id:'cc_'+Date.now(),name,outstanding:owed,limit:lim,dueDay:due,icon});
+  state.creditCards.push({id:'cc_'+Date.now(),name,outstanding:owed,lastStatement:lastStmt,limit:lim,dueDay:due,icon});
   save(); acctUI.showAddCC=false; render();
 };
 
@@ -654,6 +662,63 @@ window.recAskDelete   = id => { recUI.deleteRecId=id; recUI.editRecId=null; rend
 window.recCancelDelete= () => { recUI.deleteRecId=null; render(); };
 window.recConfirmDelete=() => { state.recurring=state.recurring.filter(r=>r.id!==recUI.deleteRecId); save(); recUI.deleteRecId=null; render(); };
 window.recToggleActive= id => { const r=state.recurring.find(x=>x.id===id); if(r) r.active=!r.active; save(); render(); };
+window.recDuplicate   = id => {
+  const r=state.recurring.find(x=>x.id===id); if(!r) return;
+  const copy={...r, id:'rec_'+Date.now(), name:r.name+' (copy)', active:false};
+  state.recurring.push(copy); save(); render();
+};
+
+// ── Icon Picker ──────────────────────────────────────────
+const ICON_SETS = {
+  bank:    ['🏦','🏧','💰','💵','💳','🏪','🏢','🏬','🔑','💼'],
+  ewallet: ['📱','💜','🟢','🔵','⚡','📲','💸','🪙','📡','🌐'],
+  cash:    ['💵','💴','💶','💷','🪙','💰','👛','🤑','💲','🏷️'],
+  cc:      ['💳','🔴','🔵','🟡','⬛','🟦','🏦','💜','🟠','💎'],
+  rec:     ['🔁','📅','🏠','🚗','💡','📱','🛡️','🐱','🍔','✈️','💼','🎯','🏋️','💈','🌊','🎵','📦','🔒','🌱','⚽'],
+  goal:    ['🎯','🏠','🚗','✈️','💍','🎓','🏋️','💻','🌴','🎸','🏖️','👶','🐕','📸','🎨','🍀','🚀','⭐','🏆','💫'],
+  general: ['😊','🌟','❤️','🔥','⚡','🎉','🌈','🦋','🌸','🍀','🎵','🎮','📚','🍕','☕','🌙','☀️','🐱','🐶','🦊'],
+};
+window.iconPickerOpen = (inputId, setKey='general') => {
+  iconPickerUI = { targetId: inputId, setKey };
+  // render picker overlay
+  const existing = document.getElementById('icon-picker-overlay');
+  if (existing) existing.remove();
+  const icons = ICON_SETS[setKey] || ICON_SETS.general;
+  const inp = document.getElementById(inputId);
+  const overlay = document.createElement('div');
+  overlay.id = 'icon-picker-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:flex-end;justify-content:center;background:rgba(0,0,0,0.6)';
+  overlay.innerHTML = `
+    <div style="width:100%;max-width:420px;background:#1d2027;border-radius:20px 20px 0 0;padding:20px;border:1px solid #374151;border-bottom:none" onclick="event.stopPropagation()">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+        <div style="font-weight:600;font-size:14px;color:#e5e7eb">Choose Icon</div>
+        <button onclick="iconPickerClose()" style="background:none;border:none;color:#6b7280;cursor:pointer;font-size:22px;line-height:1">×</button>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(8,1fr);gap:8px;margin-bottom:12px">
+        ${icons.map(ic=>`<button onclick="iconPickerSelect('${inputId}','${ic}')" style="background:#0f1116;border:2px solid ${inp&&inp.value===ic?'#6366f1':'transparent'};border-radius:10px;padding:8px;font-size:22px;cursor:pointer;line-height:1;transition:border-color 0.1s" onmouseover="this.style.background='#374151'" onmouseout="this.style.background='#0f1116'">${ic}</button>`).join('')}
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input id="icon-picker-custom" placeholder="Or type/paste any emoji…" value="${inp?inp.value:''}" style="flex:1;background:#0f1116;border:1px solid #374151;border-radius:10px;padding:10px 12px;color:#e5e7eb;font-size:16px;font-family:inherit" oninput="iconPickerPreview(this.value)">
+        <button onclick="iconPickerApplyCustom('${inputId}')" style="background:#6366f1;border:none;border-radius:10px;padding:10px 16px;color:#fff;font-size:13px;font-weight:600;cursor:pointer">Use</button>
+      </div>
+      <div id="icon-preview" style="text-align:center;font-size:40px;margin-top:10px;min-height:50px">${inp?inp.value:''}</div>
+    </div>`;
+  overlay.addEventListener('click', () => iconPickerClose());
+  document.body.appendChild(overlay);
+};
+window.iconPickerClose = () => { const el=document.getElementById('icon-picker-overlay'); if(el) el.remove(); };
+window.iconPickerSelect = (inputId, icon) => {
+  const inp = document.getElementById(inputId);
+  if (inp) { inp.value = icon; }
+  const btn = document.getElementById(inputId+'-btn');
+  if (btn) btn.textContent = icon;
+  iconPickerClose();
+};
+window.iconPickerPreview = val => { const p=document.getElementById('icon-preview'); if(p) p.textContent=val; };
+window.iconPickerApplyCustom = inputId => {
+  const custom=document.getElementById('icon-picker-custom')?.value.trim();
+  if (custom) iconPickerSelect(inputId, custom);
+};
 window.recUpdateSub   = (catSel,subSel) => {
   const catId=document.getElementById(catSel)?.value;
   const el=document.getElementById(subSel); if(!el) return;
@@ -1052,12 +1117,23 @@ function renderDashboard() {
       </div>`;
   }
 
-  const nw=netWorth(), assets=totalAssets(), liab=totalLiab();
+  const nw=netWorth(), assets=totalAssets(), spendable=spendableAssets(), liab=totalLiab();
   const m=getMonthlyData();
   const net=m.income-m.expenses;
   const incomeW=Math.min((m.income/Math.max(m.income,m.expenses))*100,100);
   const expW=Math.min((m.expenses/Math.max(m.income,m.expenses))*100,100);
-  const dailyBurn=m.avgMonthlyExpenses/30, runway=Math.floor(assets/dailyBurn);
+  // Auto-compute avg monthly expenses from last 3 months of actual transactions
+  const autoAvgExp = (() => {
+    const months = [];
+    for (let i=1; i<=3; i++) {
+      const mo = (now.getMonth()-i+12)%12, yr = now.getMonth()-i<0?now.getFullYear()-1:now.getFullYear();
+      const sum = (state.transactions||[]).filter(t=>{ const d=new Date(t.date+'T00:00:00'); return t.type==='expense'&&d.getFullYear()===yr&&d.getMonth()===mo; }).reduce((s,t)=>s+t.amount,0);
+      if (sum>0) months.push(sum);
+    }
+    return months.length>0 ? months.reduce((a,b)=>a+b,0)/months.length : (m.avgMonthlyExpenses||0);
+  })();
+  const dailyBurn = autoAvgExp/30;
+  const runway = dailyBurn>0 ? Math.floor(spendable/dailyBurn) : 0;
   const savingsRate=m.income>0?((net/m.income)*100).toFixed(1):0;
   const maxCat=Math.max(...m.categories.map(c=>c.amount),1);
   const forecastEnd=new Date(now.getTime()+(state.forecastDays||7)*24*60*60*1000).toISOString().split('T')[0];
@@ -1067,7 +1143,12 @@ function renderDashboard() {
   };
   const forecastIncome=forecastItems.income.reduce((s,r)=>s+r.amount,0);
   const forecastExpense=forecastItems.expense.reduce((s,r)=>s+r.amount,0);
-  const available=assets+forecastIncome-forecastExpense;
+  // Also include CC due payments in forecast expenses
+  const ccForecastExp = (state.creditCards||[]).filter(c=>{
+    const due = new Date(now.getFullYear(),now.getMonth(),c.dueDay).toISOString().split('T')[0];
+    return due>=todayISO&&due<=forecastEnd&&c.outstanding>0;
+  }).reduce((s,c)=>s+c.outstanding,0);
+  const available=spendable+forecastIncome-forecastExpense-ccForecastExp;
   // Compute vs Last Month dynamically
   const curMo=now.getMonth(), curYr=now.getFullYear();
   const prevMo=curMo===0?11:curMo-1, prevYr=curMo===0?curYr-1:curYr;
@@ -1127,7 +1208,7 @@ function renderDashboard() {
         <div class="text-xs text-gray-500 mb-1">🔥 Daily Burn Rate</div>
         <div class="text-2xl font-bold">${fmt(dailyBurn)}</div>
         <div class="text-xs text-gray-600 mt-1">per day</div>
-        <div class="mt-3 pt-3 border-t border-gray-800"><div class="text-xs text-gray-500">Avg monthly spend</div><div class="text-sm font-medium mt-0.5">${editable(m.avgMonthlyExpenses,'monthly.avgMonthlyExpenses',fmt)}</div></div>
+        <div class="mt-3 pt-3 border-t border-gray-800"><div class="text-xs text-gray-500">3-mo avg spend</div><div class="text-sm font-medium mt-0.5">${fmt(autoAvgExp)}</div></div>
       </div>
       <div class="bg-[#1d2027] rounded-2xl p-5">
         <div class="text-xs text-gray-500 mb-1">⏱️ Cash Runway</div>
@@ -1159,10 +1240,10 @@ function renderDashboard() {
       <div class="text-xs text-gray-600 font-semibold tracking-wider mt-4 mb-2">SCHEDULED INCOME</div>
       ${forecastItems.income.length===0?`<div class="text-xs text-gray-700 py-1.5">None in this window</div>`:forecastItems.income.map(r=>`<div class="flex justify-between items-center py-1.5"><div class="text-sm flex items-center gap-2"><span>${r.icon}</span>${r.name}</div><div class="text-sm ${r.amount===0?'text-gray-700':'text-emerald-400'}">${r.amount===0?'—':'+ '+fmt(r.amount)}</div></div>`).join('')}
       <div class="text-xs text-gray-600 font-semibold tracking-wider mt-4 mb-2">SCHEDULED EXPENSES</div>
-      ${forecastItems.expense.length===0?`<div class="text-xs text-gray-700 py-1.5">None in this window</div>`:forecastItems.expense.map(r=>`<div class="flex justify-between items-center py-1.5"><div class="text-sm flex items-center gap-2"><span>${r.icon}</span>${r.name}</div><div class="text-sm text-red-400">− ${fmt(r.amount)}</div></div>`).join('')}
+      ${forecastItems.expense.length===0&&ccForecastExp===0?`<div class="text-xs text-gray-700 py-1.5">None in this window</div>`:forecastItems.expense.map(r=>`<div class="flex justify-between items-center py-1.5"><div class="text-sm flex items-center gap-2"><span>${r.icon}</span>${r.name}</div><div class="text-sm text-red-400">− ${fmt(r.amount)}</div></div>`).join('')}
+      ${(state.creditCards||[]).filter(c=>{const due=new Date(now.getFullYear(),now.getMonth(),c.dueDay).toISOString().split('T')[0];return due>=todayISO&&due<=forecastEnd&&c.outstanding>0;}).map(c=>`<div class="flex justify-between items-center py-1.5"><div class="text-sm flex items-center gap-2"><span>💳</span>${c.name} payment <span class="text-xs text-amber-500 ml-1">due ${c.dueDay}${sfx(c.dueDay)}</span></div><div class="text-sm text-red-400">− ${fmt(c.outstanding)}</div></div>`).join('')}
       <div class="flex justify-between items-center pt-4 mt-3 border-t border-gray-800"><span class="font-semibold">Available to spend</span><span class="text-lg font-bold ${available>=0?'text-emerald-400':'text-red-400'}">${fmt2(available)}</span></div>
     </div>
-    <div class="bg-[#1d2027] rounded-2xl p-5">
       <div class="flex items-center gap-2 mb-4"><span>🎯</span><span class="font-semibold">Financial Goals</span></div>
       ${state.goals.map(g=>{
         const gs=computeGoalSaved(g);
@@ -1220,7 +1301,8 @@ function renderRecurring() {
             <button onclick="${onClose}" style="background:none;border:none;color:#6b7280;cursor:pointer;font-size:22px;line-height:1">×</button>
           </div>
           <div class="grid gap-3 mb-3" style="grid-template-columns:56px 1fr">
-            <div><div class="field-label">ICON</div><input id="${pfx}rec-icon" ${r?`value="${r.icon||'🔁'}"`:'placeholder="🔁"'} class="field-input" style="font-size:20px;text-align:center;padding:8px 4px"></div>
+            <div><div class="field-label">ICON</div><input type="hidden" id="${pfx}rec-icon" value="${r?r.icon||'🔁':'🔁'}">
+              <button type="button" onclick="iconPickerOpen('${pfx}rec-icon','rec')" id="${pfx}rec-icon-btn" onmouseover="this.style.borderColor='#6366f1'" onmouseout="this.style.borderColor='#374151'" style="width:100%;height:44px;background:#0f1116;border:1px solid #374151;border-radius:10px;font-size:24px;cursor:pointer;line-height:1;transition:border-color 0.15s">${r?r.icon||'🔁':'🔁'}</button></div>
             <div><div class="field-label">NAME *</div><input id="${pfx}rec-name" type="text" ${r?`value="${r.name}"`:'placeholder="e.g. Rent"'} class="field-input"></div>
           </div>
           <div class="grid grid-cols-2 gap-3 mb-3">
@@ -1304,6 +1386,7 @@ function renderRecurring() {
             <div class="font-bold text-sm" style="color:${typeColor}">${r.type==='income'?'+':'-'}${fmt2(r.amount)}</div>
             <div class="flex gap-1 mt-1 justify-end">
               <button onclick="recToggleActive('${r.id}')" title="${r.active?'Pause':'Resume'}" style="background:#0f1116;border:none;color:#9ca3af;cursor:pointer;border-radius:8px;padding:5px 7px;font-size:13px">${r.active?'⏸':'▶'}</button>
+              <button onclick="recDuplicate('${r.id}')" title="Duplicate" style="background:#0f1116;border:none;color:#9ca3af;cursor:pointer;border-radius:8px;padding:5px 7px;font-size:13px">⧉</button>
               <button onclick="recOpenEdit('${r.id}')" style="background:#0f1116;border:none;color:#9ca3af;cursor:pointer;border-radius:8px;padding:5px 7px;font-size:13px">✏️</button>
               <button onclick="recAskDelete('${r.id}')" style="background:#0f1116;border:none;color:#9ca3af;cursor:pointer;border-radius:8px;padding:5px 7px;font-size:13px">🗑️</button>
             </div>
@@ -1491,7 +1574,8 @@ function renderGoals() {
           <button onclick="goalCloseAdd()" style="background:none;border:none;color:#6b7280;cursor:pointer;font-size:22px;line-height:1">×</button>
         </div>
         <div class="grid gap-3 mb-3" style="grid-template-columns:56px 1fr">
-          <div><div class="field-label">ICON</div><input id="goal-icon" placeholder="🎯" class="field-input" style="font-size:20px;text-align:center;padding:8px 4px"></div>
+          <div><div class="field-label">ICON</div><input type="hidden" id="goal-icon" value="🎯">
+          <button type="button" onclick="iconPickerOpen('goal-icon','goal')" id="goal-icon-btn" onmouseover="this.style.borderColor='#6366f1'" onmouseout="this.style.borderColor='#374151'" style="width:100%;height:44px;background:#0f1116;border:1px solid #374151;border-radius:10px;font-size:24px;cursor:pointer;line-height:1;transition:border-color 0.15s">🎯</button></div>
           <div><div class="field-label">GOAL NAME *</div><input id="goal-name" type="text" placeholder="e.g. Emergency Fund" class="field-input"></div>
         </div>
         <div class="grid grid-cols-2 gap-3 mb-3">
@@ -1523,7 +1607,8 @@ function renderGoals() {
           <button onclick="goalCancelEdit()" style="background:none;border:none;color:#6b7280;cursor:pointer;font-size:22px;line-height:1">×</button>
         </div>
         <div class="grid gap-3 mb-3" style="grid-template-columns:56px 1fr">
-          <div><div class="field-label">ICON</div><input id="edit-goal-icon" value="${editGoal.icon||'🎯'}" class="field-input" style="font-size:20px;text-align:center;padding:8px 4px"></div>
+          <div><div class="field-label">ICON</div><input type="hidden" id="edit-goal-icon" value="${editGoal.icon||'🎯'}">
+          <button type="button" onclick="iconPickerOpen('edit-goal-icon','goal')" id="edit-goal-icon-btn" onmouseover="this.style.borderColor='#6366f1'" onmouseout="this.style.borderColor='#374151'" style="width:100%;height:44px;background:#0f1116;border:1px solid #374151;border-radius:10px;font-size:24px;cursor:pointer;line-height:1;transition:border-color 0.15s">${editGoal.icon||'🎯'}</button></div>
           <div><div class="field-label">GOAL NAME *</div><input id="edit-goal-name" type="text" value="${editGoal.name}" class="field-input"></div>
         </div>
         <div class="grid grid-cols-2 gap-3 mb-3">
@@ -1580,6 +1665,8 @@ function renderAccounts() {
   const cashList = state.accounts.filter(a=>a.type==='cash');
   const sumB=banks.reduce((s,a)=>s+a.balance,0), sumE=ewallets.reduce((s,a)=>s+a.balance,0), sumC=cashList.reduce((s,a)=>s+a.balance,0);
   const totalDebit=sumB+sumE+sumC, totalOwed=state.creditCards.reduce((s,c)=>s+c.outstanding,0), nw=totalDebit-totalOwed;
+  const totalMaintaining=state.accounts.reduce((s,a)=>s+(a.maintainingBalance||0),0);
+  const totalSpendable=totalDebit-totalMaintaining;
 
   function acctCard(a) {
     const conf=TC[a.type||'bank'];
@@ -1594,10 +1681,14 @@ function renderAccounts() {
     if (acctUI.editAcctId===a.id) return `
       <div class="rounded-xl p-4 mb-2" style="background:#0f1116;border:1px solid #6366f1">
         <div class="grid gap-3 mb-3" style="grid-template-columns:56px 1fr">
-          <div><div class="field-label">ICON</div><input id="edit-acct-icon-${a.id}" value="${a.icon||conf.icon}" class="field-input" style="font-size:20px;text-align:center;padding:8px 4px"></div>
+          <div><div class="field-label">ICON</div><input type="hidden" id="edit-acct-icon-${a.id}" value="${a.icon||conf.icon}">
+          <button type="button" onclick="iconPickerOpen('edit-acct-icon-${a.id}','${a.type||'bank'}')" onmouseover="this.style.borderColor='#6366f1'" onmouseout="this.style.borderColor='#374151'" id="edit-acct-icon-${a.id}-btn" style="width:100%;height:44px;background:#0f1116;border:1px solid #374151;border-radius:10px;font-size:24px;cursor:pointer;line-height:1;transition:border-color 0.15s">${a.icon||conf.icon}</button></div>
           <div><div class="field-label">NAME</div><input id="edit-acct-name-${a.id}" value="${a.name}" class="field-input"></div>
         </div>
-        <div class="mb-3"><div class="field-label">BALANCE (₱)</div><input id="edit-acct-bal-${a.id}" type="number" step="0.01" value="${a.balance}" class="field-input"></div>
+        <div class="grid grid-cols-2 gap-3 mb-3">
+          <div><div class="field-label">BALANCE (₱)</div><input id="edit-acct-bal-${a.id}" type="number" step="0.01" value="${a.balance}" class="field-input"></div>
+          <div><div class="field-label">MAINTAINING BAL. (₱)</div><input id="edit-acct-mbal-${a.id}" type="number" step="0.01" value="${a.maintainingBalance||0}" class="field-input" title="Amount that must stay in account"></div>
+        </div>
         <div class="flex gap-2">
           <button onclick="acctUpdate('${a.id}')" class="flex-1 rounded-lg py-2 text-sm font-semibold text-white" style="background:#6366f1;border:none;cursor:pointer">Save</button>
           <button onclick="acctCancelEdit()" class="flex-1 rounded-lg py-2 text-sm" style="background:#374151;border:none;color:#9ca3af;cursor:pointer">Cancel</button>
@@ -1608,7 +1699,7 @@ function renderAccounts() {
         <div class="flex-shrink-0 flex items-center justify-center rounded-xl text-xl" style="width:42px;height:42px;background:${conf.bg}">${a.icon||conf.icon}</div>
         <div class="flex-1 min-w-0">
           <div class="text-sm font-semibold" style="color:#e5e7eb">${a.name}</div>
-          <div class="text-xs" style="color:#6b7280">${conf.label}</div>
+          <div class="text-xs" style="color:#6b7280">${conf.label}${a.maintainingBalance>0?` · <span style="color:#f59e0b">min ${fmt(a.maintainingBalance)}</span>`:''}</div>
         </div>
         <div class="font-semibold text-sm flex-shrink-0">${fmt2(a.balance)}</div>
         <div class="flex gap-1 flex-shrink-0">
@@ -1651,14 +1742,18 @@ function renderAccounts() {
     if (acctUI.editCCId===c.id) return `
       <div class="rounded-xl p-4 mb-3" style="background:#0f1116;border:1px solid #6366f1">
         <div class="grid gap-3 mb-3" style="grid-template-columns:56px 1fr">
-          <div><div class="field-label">ICON</div><input id="edit-cc-icon-${c.id}" value="${c.icon||'💳'}" class="field-input" style="font-size:20px;text-align:center;padding:8px 4px"></div>
+          <div><div class="field-label">ICON</div><input type="hidden" id="edit-cc-icon-${c.id}" value="${c.icon||'💳'}">
+          <button type="button" onclick="iconPickerOpen('edit-cc-icon-${c.id}','cc')" id="edit-cc-icon-${c.id}-btn" onmouseover="this.style.borderColor='#6366f1'" onmouseout="this.style.borderColor='#374151'" style="width:100%;height:44px;background:#0f1116;border:1px solid #374151;border-radius:10px;font-size:24px;cursor:pointer;line-height:1;transition:border-color 0.15s">${c.icon||'💳'}</button></div>
           <div><div class="field-label">NAME</div><input id="edit-cc-name-${c.id}" value="${c.name}" class="field-input"></div>
         </div>
         <div class="grid grid-cols-2 gap-3 mb-3">
           <div><div class="field-label">OUTSTANDING (₱)</div><input id="edit-cc-owed-${c.id}" type="number" step="0.01" value="${c.outstanding}" class="field-input"></div>
           <div><div class="field-label">CREDIT LIMIT (₱)</div><input id="edit-cc-lim-${c.id}" type="number" step="0.01" value="${c.limit}" class="field-input"></div>
         </div>
-        <div class="mb-3"><div class="field-label">DUE DAY (1–31)</div><input id="edit-cc-due-${c.id}" type="number" min="1" max="31" value="${c.dueDay}" class="field-input"></div>
+        <div class="grid grid-cols-2 gap-3 mb-3">
+          <div><div class="field-label">DUE DAY (1–31)</div><input id="edit-cc-due-${c.id}" type="number" min="1" max="31" value="${c.dueDay}" class="field-input"></div>
+          <div><div class="field-label">LAST STATEMENT (₱)</div><input id="edit-cc-last-stmt-${c.id}" type="number" step="0.01" value="${c.lastStatement||0}" class="field-input"></div>
+        </div>
         <div class="flex gap-2">
           <button onclick="ccUpdate('${c.id}')" class="flex-1 rounded-lg py-2 text-sm font-semibold text-white" style="background:#6366f1;border:none;cursor:pointer">Save</button>
           <button onclick="ccCancelEdit()" class="flex-1 rounded-lg py-2 text-sm" style="background:#374151;border:none;color:#9ca3af;cursor:pointer">Cancel</button>
@@ -1679,10 +1774,11 @@ function renderAccounts() {
             <button onclick="ccAskDelete('${c.id}')" style="background:#1d2027;border:none;color:#9ca3af;cursor:pointer;border-radius:8px;padding:5px 8px;font-size:13px">🗑️</button>
           </div>
         </div>
-        <div class="grid grid-cols-3 gap-2 mb-3">
+        <div class="grid grid-cols-2 gap-2 mb-3">
           <div class="rounded-lg p-3 text-center" style="background:#1d2027"><div class="text-xs mb-1" style="color:#6b7280">Outstanding</div><div class="text-sm font-bold text-red-400">${fmt(c.outstanding)}</div></div>
-          <div class="rounded-lg p-3 text-center" style="background:#1d2027"><div class="text-xs mb-1" style="color:#6b7280">Limit</div><div class="text-sm font-bold">${fmt(c.limit)}</div></div>
+          <div class="rounded-lg p-3 text-center" style="background:#1d2027"><div class="text-xs mb-1" style="color:#6b7280">Last Statement</div><div class="text-sm font-bold text-amber-400">${c.lastStatement>0?fmt(c.lastStatement):'—'}</div></div>
           <div class="rounded-lg p-3 text-center" style="background:#1d2027"><div class="text-xs mb-1" style="color:#6b7280">Available</div><div class="text-sm font-bold text-emerald-400">${fmt(avail)}</div></div>
+          <div class="rounded-lg p-3 text-center" style="background:#1d2027"><div class="text-xs mb-1" style="color:#6b7280">Credit Limit</div><div class="text-sm font-bold">${fmt(c.limit)}</div></div>
         </div>
         <div class="flex items-center gap-2">
           <div class="flex-1 rounded-full overflow-hidden" style="height:5px;background:#1d2027">
@@ -1704,10 +1800,14 @@ function renderAccounts() {
           ${['bank','ewallet','cash'].map(t=>`<button onclick="acctSetAddType('${t}')" class="flex-1 rounded-lg py-2 text-xs font-medium" style="${acctUI.addType===t?'background:#1d2027;color:#e5e7eb;border:1px solid #374151':'background:transparent;color:#6b7280;border:1px solid transparent'}">${t==='bank'?'🏦 Bank':t==='ewallet'?'📱 E-Wallet':'💵 Cash'}</button>`).join('')}
         </div>
         <div class="grid gap-3 mb-3" style="grid-template-columns:56px 1fr">
-          <div><div class="field-label">ICON</div><input id="acct-icon" placeholder="${acctUI.addType==='bank'?'🏦':acctUI.addType==='ewallet'?'📱':'💵'}" class="field-input" style="font-size:20px;text-align:center;padding:8px 4px"></div>
+          <div><div class="field-label">ICON</div><input id="acct-icon" type="hidden" value="${acctUI.addType==='bank'?'🏦':acctUI.addType==='ewallet'?'📱':'💵'}">
+          <button type="button" id="acct-icon-btn" onclick="iconPickerOpen('acct-icon',acctUI.addType)" onmouseover="this.style.borderColor='#6366f1'" onmouseout="this.style.borderColor='#374151'" style="width:100%;height:44px;background:#0f1116;border:1px solid #374151;border-radius:10px;font-size:24px;cursor:pointer;line-height:1;transition:border-color 0.15s">${acctUI.addType==='bank'?'🏦':acctUI.addType==='ewallet'?'📱':'💵'}</button></div>
           <div><div class="field-label">NAME *</div><input id="acct-name" type="text" placeholder="e.g. BDO Savings" class="field-input"></div>
         </div>
-        <div class="mb-5"><div class="field-label">BALANCE (₱)</div><input id="acct-balance" type="number" step="0.01" min="0" placeholder="0.00" class="field-input"></div>
+        <div class="grid grid-cols-2 gap-3 mb-5">
+          <div><div class="field-label">BALANCE (₱)</div><input id="acct-balance" type="number" step="0.01" min="0" placeholder="0.00" class="field-input"></div>
+          <div><div class="field-label">MAINTAINING BAL. (₱)</div><input id="acct-mbalance" type="number" step="0.01" min="0" placeholder="0.00" class="field-input" title="Min balance to keep in account"></div>
+        </div>
         <div id="acct-err" class="text-red-400 text-xs mb-3"></div>
         <div class="flex gap-3">
           <button onclick="acctSave()" class="flex-1 rounded-xl py-3 font-semibold text-white text-sm" style="background:#6366f1;border:none;cursor:pointer">Add Account</button>
@@ -1724,14 +1824,18 @@ function renderAccounts() {
           <button onclick="ccCloseAdd()" style="background:none;border:none;color:#6b7280;cursor:pointer;font-size:22px;line-height:1">×</button>
         </div>
         <div class="grid gap-3 mb-3" style="grid-template-columns:56px 1fr">
-          <div><div class="field-label">ICON</div><input id="cc-icon" placeholder="💳" class="field-input" style="font-size:20px;text-align:center;padding:8px 4px"></div>
+          <div><div class="field-label">ICON</div><input type="hidden" id="cc-icon" value="💳">
+          <button type="button" onclick="iconPickerOpen('cc-icon','cc')" id="cc-icon-btn" onmouseover="this.style.borderColor='#6366f1'" onmouseout="this.style.borderColor='#374151'" style="width:100%;height:44px;background:#0f1116;border:1px solid #374151;border-radius:10px;font-size:24px;cursor:pointer;line-height:1;transition:border-color 0.15s">💳</button></div>
           <div><div class="field-label">NAME *</div><input id="cc-name" type="text" placeholder="e.g. BPI Credit Card" class="field-input"></div>
         </div>
         <div class="grid grid-cols-2 gap-3 mb-3">
           <div><div class="field-label">OUTSTANDING (₱)</div><input id="cc-owed" type="number" step="0.01" min="0" placeholder="0.00" class="field-input"></div>
           <div><div class="field-label">CREDIT LIMIT (₱)</div><input id="cc-lim" type="number" step="0.01" min="0" placeholder="0.00" class="field-input"></div>
         </div>
-        <div class="mb-5"><div class="field-label">DUE DAY (1–31)</div><input id="cc-due" type="number" min="1" max="31" placeholder="25" class="field-input"></div>
+        <div class="grid grid-cols-2 gap-3 mb-3">
+          <div><div class="field-label">DUE DAY (1–31)</div><input id="cc-due" type="number" min="1" max="31" placeholder="25" class="field-input"></div>
+          <div><div class="field-label">LAST STATEMENT (₱)</div><input id="cc-last-stmt" type="number" step="0.01" min="0" placeholder="0.00" class="field-input"></div>
+        </div>
         <div id="cc-err" class="text-red-400 text-xs mb-3"></div>
         <div class="flex gap-3">
           <button onclick="ccSave()" class="flex-1 rounded-xl py-3 font-semibold text-white text-sm" style="background:#6366f1;border:none;cursor:pointer">Add Card</button>
@@ -1749,6 +1853,7 @@ function renderAccounts() {
         <div><div class="text-xs mb-1" style="color:rgba(255,255,255,0.5)">Total Assets</div><div class="text-lg font-semibold text-emerald-400">${fmt2(totalDebit)}</div></div>
         <div><div class="text-xs mb-1" style="color:rgba(255,255,255,0.5)">Total Owed</div><div class="text-lg font-semibold text-red-400">${fmt2(totalOwed)}</div></div>
       </div>
+      ${totalMaintaining>0?`<div style="margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.1);display:flex;justify-content:space-between;align-items:center"><div style="font-size:11px;color:rgba(255,255,255,0.45)">Spendable (excl. maintaining bal.)</div><div style="font-size:14px;font-weight:600;color:#fbbf24">${fmt2(totalSpendable)}</div></div>`:''}
     </div>
     ${section('Banks', banks, 'bank', sumB)}
     ${section('E-Wallets', ewallets, 'ewallet', sumE)}
