@@ -222,6 +222,8 @@ const totalAssets    = () => state.accounts.reduce((s,a)=>s+a.balance,0);
 const spendableAssets= () => state.accounts.reduce((s,a)=>s+(a.balance-(a.maintainingBalance||0)),0);
 const totalLiab      = () => state.creditCards.reduce((s,c)=>s+c.outstanding,0);
 const netWorth       = () => totalAssets()-totalLiab();
+// Find any account OR credit card by id — used wherever a transaction's accountId may be a CC
+const findAccount = id => state.accounts.find(a=>a.id===id) || state.creditCards.find(c=>c.id===id) || null;
 
 function daysUntil(dueDay) {
   const d = now.getDate();
@@ -276,7 +278,7 @@ function checkAndPostRecurring() {
         accountId: r.accountId||'',
         notes: 'Auto-posted'
       });
-      const acct = state.accounts.find(a=>a.id===r.accountId);
+      const acct = findAccount(r.accountId);
       if (acct) acct.balance += (r.type==='income' ? r.amount : -r.amount);
       r.lastPosted = r.nextDue;
       r.nextDue = advanceDue(r.nextDue, r.frequency);
@@ -819,7 +821,7 @@ function renderTransactions() {
           <div class="tx-icon">${cat?.icon||'💸'}</div>
           <div class="flex-1 min-w-0">
             <div class="text-sm font-medium truncate" style="color:#e5e7eb">${tx.description}</div>
-            <div class="text-xs mt-0.5" style="color:#6b7280">${tx.type==='transfer'?`🔄 Transfer → ${state.accounts.find(a=>a.id===tx.toAccountId)?.name||'?'}`:cat?.name||''}${subcat?' · '+subcat.name:''}</div>
+            <div class="text-xs mt-0.5" style="color:#6b7280">${tx.type==='transfer'?`🔄 Transfer → ${findAccount(tx.toAccountId)?.name||'?'}`:cat?.name||''}${subcat?' · '+subcat.name:''}${(() => { const a=findAccount(tx.accountId); return a ? ` · <span style="color:${state.creditCards.find(c=>c.id===tx.accountId)?'#f59e0b':'#4b5563'}">${a.icon||''}${state.creditCards.find(c=>c.id===tx.accountId)?' CC':''} ${a.name}</span>` : ''; })()}</div>
           </div>
           <div class="flex items-center gap-2 flex-shrink-0">
             <div class="text-sm font-semibold ${tx.type==='income'?'text-emerald-400':tx.type==='transfer'?'text-indigo-400':'text-red-400'}">
@@ -845,7 +847,12 @@ function renderTransactions() {
   // Modal: supports Add and Edit mode
   const activeCatOptions = (type, selId='') => state.categories.filter(c=>c.type===type&&c.active)
     .map(c=>`<option value="${c.id}" ${c.id===selId?'selected':''}>${c.icon} ${c.name}</option>`).join('');
-  const acctOptions = (selId='') => state.accounts.map(a=>`<option value="${a.id}" ${a.id===selId?'selected':''}>${a.icon} ${a.name}</option>`).join('');
+  const acctOptions = (selId='', includeCCs=true) => {
+    const debitOpts = state.accounts.map(a=>`<option value="${a.id}" ${a.id===selId?'selected':''}>${a.icon||'🏦'} ${a.name}</option>`).join('');
+    const ccOpts    = includeCCs ? state.creditCards.map(c=>`<option value="${c.id}" ${c.id===selId?'selected':''}>${c.icon||'💳'} ${c.name} (CC)</option>`).join('') : '';
+    if (!ccOpts) return debitOpts;
+    return `<optgroup label="── Debit / Cash ──">${debitOpts}</optgroup><optgroup label="── Credit Cards ──">${ccOpts}</optgroup>`;
+  };
 
   let modalHtml = '';
   if (txUI.showModal) {
@@ -923,7 +930,7 @@ function renderTransactions() {
           <div class="field-label">TO ACCOUNT *</div>
           <select id="tx-toaccount" class="field-select">
             <option value="">— Select destination account —</option>
-            ${acctOptions(initToAcct)}
+            ${acctOptions(initToAcct, false)}
           </select>
         </div>
 
@@ -1337,7 +1344,10 @@ function renderRecurring() {
           <div class="mb-5"><div class="field-label">ACCOUNT (optional)</div>
             <select id="${pfx}rec-acct" class="field-select">
               <option value="">— None —</option>
-              ${state.accounts.map(a=>`<option value="${a.id}" ${r?.accountId===a.id?'selected':''}>${a.icon||''} ${a.name}</option>`).join('')}
+              <optgroup label="── Debit / Cash ──">
+                ${state.accounts.map(a=>`<option value="${a.id}" ${r?.accountId===a.id?'selected':''}>${a.icon||''} ${a.name}</option>`).join('')}
+              </optgroup>
+              ${state.creditCards.length?`<optgroup label="── Credit Cards ──">${state.creditCards.map(c=>`<option value="${c.id}" ${r?.accountId===c.id?'selected':''}>${c.icon||'💳'} ${c.name} (CC)</option>`).join('')}</optgroup>`:''}
             </select>
           </div>
           ${errId?`<div id="${errId}" class="text-red-400 text-xs mb-3"></div>`:''}
@@ -1352,7 +1362,7 @@ function renderRecurring() {
   function recCard(r) {
     const cat=r.categoryId?state.categories.find(c=>c.id===r.categoryId):null;
     const sub=cat&&r.subcategoryId?cat.subs.find(s=>s.id===r.subcategoryId):null;
-    const acct=r.accountId?state.accounts.find(a=>a.id===r.accountId):null;
+    const acct=r.accountId?findAccount(r.accountId):null;
     const isOverdue=r.nextDue<todayISO, isDueToday=r.nextDue===todayISO;
     const typeColor=r.type==='income'?'#34d399':'#f87171';
     const typeBg=r.type==='income'?'rgba(52,211,153,0.12)':'rgba(248,113,113,0.12)';
@@ -1943,7 +1953,7 @@ window.exportCSV = () => {
   const rows = state.transactions.map(t => {
     const cat    = state.categories.find(c=>c.id===t.categoryId);
     const subcat = cat?.subs?.find(s=>s.id===t.subcategoryId);
-    const acct   = state.accounts.find(a=>a.id===t.accountId);
+    const acct   = findAccount(t.accountId);
     const esc    = v => `"${String(v||'').replace(/"/g,'""')}"`;
     return [t.date, esc(t.description), t.type, t.amount, esc(cat?.name||''), esc(subcat?.name||''), esc(acct?.name||''), esc(t.notes||'')].join(',');
   });
