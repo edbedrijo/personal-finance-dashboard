@@ -146,7 +146,7 @@ function migrateState(p) {
     if (!a.icon) a.icon = a.type==='bank' ? '🏦' : a.type==='ewallet' ? '📱' : '💵';
     if (a.maintainingBalance===undefined) a.maintainingBalance=0;
   });
-  if (p.creditCards) p.creditCards.forEach(c => { if (!c.icon) c.icon = '💳'; if (c.lastStatement===undefined) c.lastStatement=0; if (c.maintainingBalance===undefined) c.maintainingBalance=0; if (c.cycleStartDay===undefined) c.cycleStartDay=1; });
+  if (p.creditCards) p.creditCards.forEach(c => { if (!c.icon) c.icon = '💳'; if (c.lastStatement===undefined) c.lastStatement=0; if (c.maintainingBalance===undefined) c.maintainingBalance=0; if (c.cutoffDay===undefined) c.cutoffDay = c.cycleStartDay ? Math.max(1,c.cycleStartDay-1) : 22; delete c.cycleStartDay; if (c.minDue===undefined) c.minDue=0; });
   if (p.recurring) p.recurring.forEach(r => {
     if (r.dueDay !== undefined && !r.frequency) {
       r.frequency = 'monthly'; r.active = true;
@@ -587,11 +587,13 @@ window.ccUpdate = id => {
   const due=parseInt(document.getElementById('edit-cc-due-'+id)?.value);
   const icon=document.getElementById('edit-cc-icon-'+id)?.value.trim();
   const lastStmtU=parseFloat(document.getElementById('edit-cc-last-stmt-'+id)?.value);
-  const cycleStartU=parseInt(document.getElementById('edit-cc-cycle-start-'+id)?.value);
+  const cutoffDayU=parseInt(document.getElementById('edit-cc-cutoff-'+id)?.value);
+  const minDueU=parseFloat(document.getElementById('edit-cc-min-due-'+id)?.value);
   if(name) c.name=name; if(!isNaN(owed)) c.outstanding=owed;
   if(!isNaN(lim)) c.limit=lim; if(!isNaN(due)&&due>=1&&due<=31) c.dueDay=due;
   if(!isNaN(lastStmtU)) c.lastStatement=lastStmtU;
-  if(!isNaN(cycleStartU)&&cycleStartU>=1&&cycleStartU<=31) c.cycleStartDay=cycleStartU;
+  if(!isNaN(cutoffDayU)&&cutoffDayU>=1&&cutoffDayU<=31) c.cutoffDay=cutoffDayU;
+  if(!isNaN(minDueU)) c.minDue=minDueU;
   if(icon) c.icon=icon;
   save(); acctUI.editCCId=null; render();
 };
@@ -604,11 +606,12 @@ window.ccSave = () => {
   const owed=parseFloat(document.getElementById('cc-owed')?.value)||0;
   const lim=parseFloat(document.getElementById('cc-lim')?.value)||0;
   const due=parseInt(document.getElementById('cc-due')?.value)||25;
-  const cycleStart=parseInt(document.getElementById('cc-cycle-start')?.value)||1;
+  const cutoffDay=parseInt(document.getElementById('cc-cutoff')?.value)||22;
   const lastStmt=parseFloat(document.getElementById('cc-last-stmt')?.value)||0;
+  const minDue=parseFloat(document.getElementById('cc-min-due')?.value)||0;
   const icon=document.getElementById('cc-icon')?.value.trim()||'💳';
   if(!name){document.getElementById('cc-err').textContent='Name is required.';return;}
-  state.creditCards.push({id:'cc_'+Date.now(),name,outstanding:owed,lastStatement:lastStmt,limit:lim,dueDay:due,cycleStartDay:cycleStart,icon});
+  state.creditCards.push({id:'cc_'+Date.now(),name,outstanding:owed,lastStatement:lastStmt,minDue,limit:lim,dueDay:due,cutoffDay:cutoffDay,icon});
   save(); acctUI.showAddCC=false; render();
 };
 
@@ -636,19 +639,42 @@ window.ccRecordPayment = id => {
   save(); acctUI.paymentCCId=null; render();
 };
 // Compute current cycle spending from transactions tagged to this CC
-window.ccCycleSpend = id => {
-  const c = state.creditCards.find(x=>x.id===id); if(!c) return 0;
-  const start = c.cycleStartDay||1;
-  // Find the most recent cycle start date on or before today
-  let cycleStart;
-  if(now.getDate()>=start) {
-    cycleStart = new Date(now.getFullYear(),now.getMonth(),start).toISOString().split('T')[0];
+// Compute dates for a CC's billing cycle based on cutoffDay
+window.ccCycleDates = id => {
+  const c = state.creditCards.find(x=>x.id===id); if(!c) return null;
+  const cutoff = c.cutoffDay||22;
+  const cycleStartDay = cutoff===31 ? 1 : cutoff+1; // day after cutoff
+  const d = now.getDate();
+  // Current cycle start: if today >= cycleStartDay, it started this month; else last month
+  let cycleStartDate, cutoffDate;
+  if(d >= cycleStartDay) {
+    cycleStartDate = new Date(now.getFullYear(), now.getMonth(), cycleStartDay);
+    cutoffDate     = new Date(now.getFullYear(), now.getMonth(), cutoff);
+    // If cutoff < cycleStartDay it's in the same month (e.g. start=23, cutoff=22 → cutoff is next month)
+    if(cutoff < cycleStartDay) cutoffDate = new Date(now.getFullYear(), now.getMonth()+1, cutoff);
   } else {
-    const prev = new Date(now.getFullYear(),now.getMonth()-1,start);
-    cycleStart = prev.toISOString().split('T')[0];
+    cycleStartDate = new Date(now.getFullYear(), now.getMonth()-1, cycleStartDay);
+    cutoffDate     = new Date(now.getFullYear(), now.getMonth(), cutoff);
   }
+  // Due date: dueDay in the month after cutoff
+  const cutoffMo = cutoffDate.getMonth(), cutoffYr = cutoffDate.getFullYear();
+  const dueDate  = new Date(cutoffYr, cutoffMo+1, c.dueDay||1);
+  const daysToC  = Math.ceil((cutoffDate - now + 86400000) / 86400000);
+  const daysToD  = Math.ceil((dueDate   - now + 86400000) / 86400000);
+  return {
+    cycleStart: cycleStartDate.toISOString().split('T')[0],
+    cutoff:     cutoffDate.toISOString().split('T')[0],
+    due:        dueDate.toISOString().split('T')[0],
+    daysToCutoff: Math.max(0, daysToC),
+    daysToDue:    Math.max(0, daysToD),
+    cycleStartDay, cutoffDay: cutoff
+  };
+};
+// New charges since current cycle start (posted to this CC)
+window.ccCycleSpend = id => {
+  const dates = ccCycleDates(id); if(!dates) return 0;
   return (state.transactions||[])
-    .filter(t=>t.accountId===id && t.type==='expense' && t.date>=cycleStart)
+    .filter(t=>t.accountId===id && t.type==='expense' && t.date>=dates.cycleStart && t.notes!=='CC payment')
     .reduce((s,t)=>s+t.amount,0);
 };
 
@@ -1800,10 +1826,13 @@ function renderAccounts() {
 
   function ccCard(c) {
     const avail=c.limit-c.outstanding, pct=c.limit>0?Math.min((c.outstanding/c.limit)*100,100):0;
-    const dl=daysUntil(c.dueDay), barColor=pct>80?'#ef4444':pct>50?'#f59e0b':'#10b981';
     const isPaid = c.outstanding<=0;
-    const cycleSpend = ccCycleSpend(c.id);
+    const dates = ccCycleDates(c.id) || {};
+    const newCharges = ccCycleSpend(c.id);
+    const currentBalance = c.lastStatement + newCharges;
+    const barColor = pct>80?'#ef4444':pct>50?'#f59e0b':'#10b981';
 
+    // ── DELETE confirm ────────────────────────────────────
     if (acctUI.deleteCCId===c.id) return `
       <div class="rounded-xl p-4 mb-3" style="background:#1a0f0f;border:1px solid #7f1d1d">
         <div class="text-sm mb-3" style="color:#fca5a5">Delete <strong>${c.name}</strong>? Cannot be undone.</div>
@@ -1813,6 +1842,7 @@ function renderAccounts() {
         </div>
       </div>`;
 
+    // ── EDIT form ─────────────────────────────────────────
     if (acctUI.editCCId===c.id) return `
       <div class="rounded-xl p-4 mb-3" style="background:#0f1116;border:1px solid #6366f1">
         <div class="grid gap-3 mb-3" style="grid-template-columns:56px 1fr">
@@ -1821,15 +1851,16 @@ function renderAccounts() {
           <div><div class="field-label">NAME</div><input id="edit-cc-name-${c.id}" value="${c.name}" class="field-input"></div>
         </div>
         <div class="grid grid-cols-2 gap-3 mb-3">
-          <div><div class="field-label">OUTSTANDING (₱)</div><input id="edit-cc-owed-${c.id}" type="number" step="0.01" value="${c.outstanding}" class="field-input"></div>
+          <div><div class="field-label">CURRENT BALANCE (₱)</div><input id="edit-cc-owed-${c.id}" type="number" step="0.01" value="${c.outstanding}" class="field-input" title="Sync this from your bank app to correct drift"></div>
           <div><div class="field-label">CREDIT LIMIT (₱)</div><input id="edit-cc-lim-${c.id}" type="number" step="0.01" value="${c.limit}" class="field-input"></div>
         </div>
         <div class="grid grid-cols-2 gap-3 mb-3">
-          <div><div class="field-label">DUE DAY (1–31)</div><input id="edit-cc-due-${c.id}" type="number" min="1" max="31" value="${c.dueDay}" class="field-input"></div>
-          <div><div class="field-label">CYCLE START DAY</div><input id="edit-cc-cycle-start-${c.id}" type="number" min="1" max="31" value="${c.cycleStartDay||1}" class="field-input" title="Day billing cycle resets each month"></div>
+          <div><div class="field-label">CUT-OFF DAY</div><input id="edit-cc-cutoff-${c.id}" type="number" min="1" max="31" value="${c.cutoffDay||22}" class="field-input" title="Last day of billing cycle (from your statement)"></div>
+          <div><div class="field-label">DUE DAY</div><input id="edit-cc-due-${c.id}" type="number" min="1" max="31" value="${c.dueDay}" class="field-input" title="Payment due date"></div>
         </div>
         <div class="grid grid-cols-2 gap-3 mb-3">
-          <div><div class="field-label">LAST STATEMENT (₱)</div><input id="edit-cc-last-stmt-${c.id}" type="number" step="0.01" value="${c.lastStatement||0}" class="field-input"></div>
+          <div><div class="field-label">STATEMENT BALANCE (₱)</div><input id="edit-cc-last-stmt-${c.id}" type="number" step="0.01" value="${c.lastStatement||0}" class="field-input" title="Total Amount Due from your last statement"></div>
+          <div><div class="field-label">MIN. AMOUNT DUE (₱)</div><input id="edit-cc-min-due-${c.id}" type="number" step="0.01" value="${c.minDue||0}" class="field-input" title="Minimum Amount Due from your last statement"></div>
         </div>
         <div class="flex gap-2">
           <button onclick="ccUpdate('${c.id}')" class="flex-1 rounded-lg py-2 text-sm font-semibold text-white" style="background:#6366f1;border:none;cursor:pointer">Save</button>
@@ -1837,13 +1868,14 @@ function renderAccounts() {
         </div>
       </div>`;
 
+    // ── PAYMENT form ──────────────────────────────────────
     if (acctUI.paymentCCId===c.id) return `
       <div class="rounded-xl p-4 mb-3" style="background:#0f1116;border:1px solid #10b981">
         <div class="flex items-center gap-2 mb-4">
           <span style="font-size:20px">💳</span>
           <div>
             <div class="font-semibold text-sm" style="color:#e5e7eb">Record Payment — ${c.name}</div>
-            <div class="text-xs" style="color:#6b7280">Outstanding: <span style="color:#f87171;font-weight:600">${fmt(c.outstanding)}</span></div>
+            <div class="text-xs" style="color:#6b7280">Current Balance: <span style="color:#f87171;font-weight:600">${fmt(c.outstanding)}</span></div>
           </div>
         </div>
         <div class="mb-3">
@@ -1852,10 +1884,11 @@ function renderAccounts() {
         </div>
         <div class="mb-3">
           <div class="field-label">PAYMENT AMOUNT (₱)</div>
-          <input id="cc-pay-amt" type="number" step="0.01" min="0" value="${c.outstanding}" class="field-input" style="font-size:18px;font-weight:700;color:#34d399">
-          <div class="flex gap-2 mt-2">
-            <button onclick="document.getElementById('cc-pay-amt').value='${c.outstanding}'" class="text-xs px-3 py-1.5 rounded-lg" style="background:#0f1116;border:1px solid #374151;color:#9ca3af;cursor:pointer">Full · ${fmt(c.outstanding)}</button>
-            ${c.lastStatement>0?`<button onclick="document.getElementById('cc-pay-amt').value='${c.lastStatement}'" class="text-xs px-3 py-1.5 rounded-lg" style="background:#0f1116;border:1px solid #374151;color:#9ca3af;cursor:pointer">Last stmt · ${fmt(c.lastStatement)}</button>`:''}
+          <input id="cc-pay-amt" type="number" step="0.01" min="0" value="${c.lastStatement>0?c.lastStatement:c.outstanding}" class="field-input" style="font-size:18px;font-weight:700;color:#34d399">
+          <div class="flex gap-2 mt-2 flex-wrap">
+            <button onclick="document.getElementById('cc-pay-amt').value='${c.outstanding}'" class="text-xs px-3 py-1.5 rounded-lg" style="background:#0f1116;border:1px solid #374151;color:#9ca3af;cursor:pointer">Current bal · ${fmt(c.outstanding)}</button>
+            ${c.lastStatement>0?`<button onclick="document.getElementById('cc-pay-amt').value='${c.lastStatement}'" class="text-xs px-3 py-1.5 rounded-lg" style="background:#0f1116;border:1px solid rgba(245,158,11,0.4);color:#fbbf24;cursor:pointer">Stmt bal · ${fmt(c.lastStatement)}</button>`:''}
+            ${c.minDue>0?`<button onclick="document.getElementById('cc-pay-amt').value='${c.minDue}'" class="text-xs px-3 py-1.5 rounded-lg" style="background:#0f1116;border:1px solid #374151;color:#9ca3af;cursor:pointer">Min due · ${fmt(c.minDue)}</button>`:''}
           </div>
         </div>
         <div class="mb-4">
@@ -1872,17 +1905,30 @@ function renderAccounts() {
         </div>
       </div>`;
 
+    // ── CARD DISPLAY ──────────────────────────────────────
+    const cutoffLabel  = dates.cutoff    ? new Date(dates.cutoff+'T00:00:00').toLocaleDateString('en-PH',{month:'short',day:'numeric'}) : '—';
+    const dueLabel     = dates.due       ? new Date(dates.due+'T00:00:00').toLocaleDateString('en-PH',{month:'short',day:'numeric'})    : '—';
+    const startLabel   = dates.cycleStart? new Date(dates.cycleStart+'T00:00:00').toLocaleDateString('en-PH',{month:'short',day:'numeric'}) : '—';
+    const daysToC      = dates.daysToCutoff ?? '—';
+    const daysToD      = dates.daysToDue    ?? '—';
+    const pastCutoff   = dates.cutoff && todayISO > dates.cutoff;
+    const nearDue      = typeof daysToD==='number' && daysToD<=5;
+    const nearCutoff   = typeof daysToC==='number' && daysToC<=3;
+
     return `
-      <div class="rounded-xl p-4 mb-3" style="background:#0f1116;border:1px solid ${isPaid?'rgba(16,185,129,0.3)':' transparent'}">
+      <div class="rounded-xl p-4 mb-3" style="background:#0f1116;border:1px solid ${isPaid?'rgba(16,185,129,0.3)':'transparent'}">
+
+        <!-- Header -->
         <div class="flex items-start justify-between mb-3">
           <div class="flex items-center gap-3">
             <div class="flex-shrink-0 flex items-center justify-center rounded-xl text-xl" style="width:42px;height:42px;background:rgba(245,158,11,0.12)">${c.icon||'💳'}</div>
             <div>
-              <div class="flex items-center gap-2">
+              <div class="flex items-center gap-2 flex-wrap">
                 <div class="font-semibold text-sm" style="color:#e5e7eb">${c.name}</div>
                 ${isPaid?`<span class="text-xs px-2 py-0.5 rounded-full font-semibold" style="background:rgba(16,185,129,0.15);color:#34d399">✅ Paid</span>`:''}
+                ${nearDue&&!isPaid?`<span class="text-xs px-2 py-0.5 rounded-full font-semibold" style="background:rgba(248,113,113,0.15);color:#f87171">⚠️ Due soon</span>`:''}
               </div>
-              <div class="text-xs mt-0.5" style="color:#6b7280">Due ${c.dueDay}${sfx(c.dueDay)} · <span style="color:${dl<=5?'#f87171':dl<=10?'#fbbf24':'#6b7280'}">${dl}d away</span> · Cycle starts ${c.cycleStartDay||1}${sfx(c.cycleStartDay||1)}</div>
+              <div class="text-xs mt-0.5" style="color:#6b7280">Cut-off ${c.cutoffDay||22}${sfx(c.cutoffDay||22)} · Due ${c.dueDay}${sfx(c.dueDay)}</div>
             </div>
           </div>
           <div class="flex gap-1 flex-shrink-0">
@@ -1891,17 +1937,66 @@ function renderAccounts() {
             <button onclick="ccAskDelete('${c.id}')" style="background:#1d2027;border:none;color:#9ca3af;cursor:pointer;border-radius:8px;padding:5px 8px;font-size:13px">🗑️</button>
           </div>
         </div>
-        <div class="grid grid-cols-2 gap-2 mb-3">
-          <div class="rounded-lg p-3 text-center" style="background:#1d2027"><div class="text-xs mb-1" style="color:#6b7280">Outstanding</div><div class="text-sm font-bold ${isPaid?'text-emerald-400':'text-red-400'}">${isPaid?'Paid ✓':fmt(c.outstanding)}</div></div>
-          <div class="rounded-lg p-3 text-center" style="background:#1d2027"><div class="text-xs mb-1" style="color:#6b7280">Last Statement</div><div class="text-sm font-bold text-amber-400">${c.lastStatement>0?fmt(c.lastStatement):'—'}</div></div>
-          <div class="rounded-lg p-3 text-center" style="background:#1d2027"><div class="text-xs mb-1" style="color:#6b7280">Available</div><div class="text-sm font-bold text-emerald-400">${fmt(avail)}</div></div>
-          <div class="rounded-lg p-3 text-center" style="background:#1d2027"><div class="text-xs mb-1" style="color:#6b7280">Credit Limit</div><div class="text-sm font-bold">${fmt(c.limit)}</div></div>
+
+        <!-- Billing Cycle Timeline -->
+        <div class="rounded-lg p-3 mb-3" style="background:#14171c;border:1px solid #1f2937">
+          <div class="flex items-center justify-between text-xs mb-2" style="color:#6b7280">
+            <span>📅 Billing Cycle</span>
+            <span style="color:${nearCutoff?'#f87171':'#6b7280'}">${pastCutoff?'Grace period':''+daysToC+' days to cut-off'}</span>
+          </div>
+          <div class="flex items-center gap-1 text-xs">
+            <div class="text-center flex-1">
+              <div style="color:#818cf8;font-weight:600">${startLabel}</div>
+              <div style="color:#4b5563;margin-top:1px">Cycle start</div>
+            </div>
+            <div style="flex:2;height:2px;background:linear-gradient(90deg,#6366f1,${pastCutoff?'#6366f1':'#1f2937'});border-radius:1px;position:relative">
+              ${!pastCutoff?`<div style="position:absolute;top:-3px;width:8px;height:8px;border-radius:50%;background:#6366f1;left:${Math.min(95,Math.max(2,100-(daysToC/(daysToC+(now.getDate()-parseInt(dates.cycleStart?.split('-')[2]||1)+1||1))*100)))}%;transform:translateX(-50%)"></div>`:''}
+            </div>
+            <div class="text-center flex-1">
+              <div style="color:${pastCutoff?'#34d399':nearCutoff?'#f87171':'#9ca3af'};font-weight:600">${cutoffLabel}</div>
+              <div style="color:#4b5563;margin-top:1px">Cut-off</div>
+            </div>
+            <div style="flex:1;height:2px;background:${pastCutoff?'linear-gradient(90deg,#10b981,#1f2937)':'#1f2937'};border-radius:1px"></div>
+            <div class="text-center flex-1">
+              <div style="color:${nearDue?'#f87171':'#9ca3af'};font-weight:600">${dueLabel}</div>
+              <div style="color:#4b5563;margin-top:1px">Due date</div>
+            </div>
+          </div>
+          <div class="flex justify-between text-xs mt-2" style="color:#4b5563">
+            <span>${pastCutoff?'Statement closed':'Charges here → this bill'}</span>
+            <span style="color:${nearDue?'#f87171':'#4b5563'}">${daysToD}d to pay</span>
+          </div>
         </div>
-        ${c.lastStatement>0?`
-        <div class="flex items-center justify-between py-2 px-3 rounded-lg mb-3" style="background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.15)">
-          <div class="text-xs" style="color:#9ca3af">📈 Projected next statement <span style="color:#6b7280">(last stmt + new charges)</span></div>
-          <div class="text-sm font-bold" style="color:#818cf8">${fmt(c.lastStatement + cycleSpend)}</div>
+
+        <!-- Balance Grid -->
+        <div class="grid grid-cols-2 gap-2 mb-3">
+          <div class="rounded-lg p-3" style="background:#1d2027">
+            <div class="text-xs mb-1" style="color:#6b7280">Statement Balance</div>
+            <div class="text-sm font-bold text-amber-400">${c.lastStatement>0?fmt(c.lastStatement):'—'}</div>
+            <div class="text-xs mt-0.5" style="color:#4b5563">Last billed amount</div>
+          </div>
+          <div class="rounded-lg p-3" style="background:#1d2027">
+            <div class="text-xs mb-1" style="color:#6b7280">Current Balance</div>
+            <div class="text-sm font-bold ${isPaid?'text-emerald-400':'text-red-400'}">${isPaid?'Paid ✓':fmt(c.outstanding)}</div>
+            <div class="text-xs mt-0.5" style="color:#4b5563">${newCharges>0?`+${fmt(newCharges)} new charges`:'No new charges'}</div>
+          </div>
+          <div class="rounded-lg p-3" style="background:#1d2027">
+            <div class="text-xs mb-1" style="color:#6b7280">Available Credit</div>
+            <div class="text-sm font-bold text-emerald-400">${fmt(avail)}</div>
+          </div>
+          <div class="rounded-lg p-3" style="background:#1d2027">
+            <div class="text-xs mb-1" style="color:#6b7280">Credit Limit</div>
+            <div class="text-sm font-bold">${fmt(c.limit)}</div>
+          </div>
+        </div>
+
+        ${c.minDue>0&&!isPaid?`
+        <div class="flex items-center justify-between py-2 px-3 rounded-lg mb-3" style="background:rgba(245,158,11,0.06);border:1px solid rgba(245,158,11,0.2)">
+          <div class="text-xs" style="color:#9ca3af">⚠️ Minimum Amount Due <span style="color:#4b5563">· pay by ${dueLabel}</span></div>
+          <div class="text-sm font-bold text-amber-400">${fmt(c.minDue)}</div>
         </div>`:''}
+
+        <!-- Utilization bar -->
         <div class="flex items-center gap-2">
           <div class="flex-1 rounded-full overflow-hidden" style="height:5px;background:#1d2027">
             <div style="width:${pct.toFixed(1)}%;height:5px;background:${isPaid?'#10b981':barColor};border-radius:3px;transition:width 0.3s"></div>
@@ -1953,10 +2048,13 @@ function renderAccounts() {
           <div><div class="field-label">OUTSTANDING (₱)</div><input id="cc-owed" type="number" step="0.01" min="0" placeholder="0.00" class="field-input"></div>
           <div><div class="field-label">CREDIT LIMIT (₱)</div><input id="cc-lim" type="number" step="0.01" min="0" placeholder="0.00" class="field-input"></div>
         </div>
-        <div class="grid grid-cols-3 gap-3 mb-3">
-          <div><div class="field-label">DUE DAY</div><input id="cc-due" type="number" min="1" max="31" placeholder="25" class="field-input"></div>
-          <div><div class="field-label">CYCLE START</div><input id="cc-cycle-start" type="number" min="1" max="31" placeholder="1" class="field-input" title="Day billing cycle resets each month"></div>
-          <div><div class="field-label">LAST STMT (₱)</div><input id="cc-last-stmt" type="number" step="0.01" min="0" placeholder="0.00" class="field-input"></div>
+        <div class="grid grid-cols-2 gap-3 mb-3">
+          <div><div class="field-label">CUT-OFF DAY</div><input id="cc-cutoff" type="number" min="1" max="31" placeholder="22" class="field-input" title="Last day of billing cycle (from your statement)"></div>
+          <div><div class="field-label">DUE DAY</div><input id="cc-due" type="number" min="1" max="31" placeholder="8" class="field-input"></div>
+        </div>
+        <div class="grid grid-cols-2 gap-3 mb-3">
+          <div><div class="field-label">STATEMENT BAL. (₱)</div><input id="cc-last-stmt" type="number" step="0.01" min="0" placeholder="0.00" class="field-input" title="Total Amount Due from your last statement"></div>
+          <div><div class="field-label">MIN. AMOUNT DUE (₱)</div><input id="cc-min-due" type="number" step="0.01" min="0" placeholder="0.00" class="field-input"></div>
         </div>
         <div id="cc-err" class="text-red-400 text-xs mb-3"></div>
         <div class="flex gap-3">
