@@ -32,12 +32,13 @@
   .field-label { font-size: 11px; font-weight: 600; letter-spacing: 0.07em; color: #6b7280; text-transform: uppercase; margin-bottom: 5px; }
   .field-input { width: 100%; background: #0f1116; border: 1px solid #374151; border-radius: 10px; color: #e5e7eb; outline: none; padding: 10px 13px; font-family: inherit; font-size: 14px; box-sizing: border-box; -webkit-appearance: none; appearance: none; }
   .field-input:focus { border-color: #6366f1; }
-  input[type="date"].field-input { text-align: left; color: #e5e7eb; }
+  input[type="date"].field-input { text-align: left; color: #e5e7eb; color-scheme: dark; }
+  input[type="date"].field-input::-webkit-calendar-picker-indicator { filter: invert(1) brightness(2); cursor: pointer; }
   .field-select { width: 100%; background: #0f1116; border: 1px solid #374151; border-radius: 10px; color: #e5e7eb; outline: none; padding: 10px 13px; font-family: inherit; font-size: 14px; box-sizing: border-box; appearance: none; }
   .field-select:focus { border-color: #6366f1; }
   .tx-row { display: flex; align-items: center; gap: 12px; padding: 11px 0; border-bottom: 1px solid #1f2937; }
   .tx-row:last-child { border-bottom: none; }
-  .tx-icon { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; background: #0f1116; }
+  .tx-icon { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; background: #252830; }
   ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: #14171c; } ::-webkit-scrollbar-thumb { background: #2d3139; border-radius: 3px; }
 
   /* ── Bottom Navigation Bar ── */
@@ -279,7 +280,7 @@ function checkAndPostRecurring() {
         notes: 'Auto-posted'
       });
       const acct = findAccount(r.accountId);
-      if (acct) acct.balance += (r.type==='income' ? r.amount : -r.amount);
+      if (acct) adjustAccount(r.accountId, r.type, r.amount, +1);
       r.lastPosted = r.nextDue;
       r.nextDue = advanceDue(r.nextDue, r.frequency);
       posted++;
@@ -494,14 +495,20 @@ window.txSave = () => {
     return;
   }
   if (txUI.editId) {
-    // Edit existing — reverse old CC effect, apply new
+    // Edit existing — reverse old effect, apply new
     const tx = state.transactions.find(t => t.id === txUI.editId);
     if (tx) {
-      if (tx.notes!=='CC payment') adjustCC(tx.accountId, tx.type, tx.amount, -1); // reverse old
+      if (tx.notes!=='CC payment') {
+        adjustAccount(tx.accountId, tx.type, tx.amount, -1);
+        if (tx.type==='transfer') adjustTransferDest(tx.toAccountId, tx.amount, -1);
+      }
       tx.date = date; tx.description = desc; tx.type = type; tx.amount = amt;
       tx.categoryId = catId; tx.subcategoryId = subId; tx.accountId = accId;
       tx.notes = notes; tx.toAccountId = toAccId;
-      if (tx.notes!=='CC payment') adjustCC(accId, type, amt, +1); // apply new
+      if (tx.notes!=='CC payment') {
+        adjustAccount(accId, type, amt, +1);
+        if (type==='transfer') adjustTransferDest(toAccId, amt, +1);
+      }
     }
   } else {
     // Add new
@@ -511,28 +518,51 @@ window.txSave = () => {
       categoryId: catId, subcategoryId: subId, accountId: accId,
       toAccountId: toAccId, notes
     });
-    adjustCC(accId, type, amt, +1);
+    adjustAccount(accId, type, amt, +1);
+    if (type==='transfer') adjustTransferDest(toAccId, amt, +1);
   }
   save(); txUI.showModal=false; txUI.editId=null; render();
 };
 
 // ── CC outstanding auto-adjustment ──────────────────────
-// Apply a transaction's effect on CC outstanding (delta = +amt or -amt)
 function adjustCC(accountId, type, amount, delta) {
-  // Only affects credit cards, not debit accounts
   const cc = state.creditCards.find(c=>c.id===accountId);
   if (!cc) return;
   if (type==='expense') cc.outstanding = Math.max(0, cc.outstanding + delta * amount);
-  // income to a CC = refund/cashback → reduces outstanding
   if (type==='income')  cc.outstanding = Math.max(0, cc.outstanding - delta * amount);
+}
+
+// ── Debit account balance auto-adjustment ───────────────
+// delta: +1 = apply transaction, -1 = reverse transaction
+function adjustDebit(accountId, type, amount, delta) {
+  const acct = state.accounts.find(a=>a.id===accountId);
+  if (!acct) return;
+  if (type==='expense')  acct.balance = acct.balance - delta * amount;
+  if (type==='income')   acct.balance = acct.balance + delta * amount;
+  // transfers: from-account loses money
+  if (type==='transfer') acct.balance = acct.balance - delta * amount;
+}
+
+// Adjust both CC and debit together (one always a no-op)
+function adjustAccount(accountId, type, amount, delta) {
+  adjustCC(accountId, type, amount, delta);
+  adjustDebit(accountId, type, amount, delta);
+}
+
+// For transfers: also credit the destination debit account
+function adjustTransferDest(toAccountId, amount, delta) {
+  const acct = state.accounts.find(a=>a.id===toAccountId);
+  if (acct) acct.balance = acct.balance + delta * amount;
 }
 
 window.txAskDelete = id => { txUI.deleteId=id; render(); };
 window.txCancelDelete = () => { txUI.deleteId=null; render(); };
 window.txConfirmDelete = () => {
   const tx = state.transactions.find(t=>t.id===txUI.deleteId);
-  // Reverse the CC effect when deleting (skip CC payment transactions — those are handled by ccRecordPayment)
-  if (tx && tx.notes!=='CC payment') adjustCC(tx.accountId, tx.type, tx.amount, -1);
+  if (tx && tx.notes!=='CC payment') {
+    adjustAccount(tx.accountId, tx.type, tx.amount, -1);
+    if (tx.type==='transfer') adjustTransferDest(tx.toAccountId, tx.amount, -1);
+  }
   state.transactions = state.transactions.filter(t=>t.id!==txUI.deleteId);
   save(); txUI.deleteId=null; render();
 };
@@ -632,10 +662,12 @@ window.ccRecordPayment = id => {
     accountId: fromId||'', toAccountId: id,
     notes:'CC payment'
   });
-  // Reduce outstanding balance
+  // Reduce outstanding balance on CC
   c.outstanding = Math.max(0, c.outstanding - amt);
-  // If fully paid, set lastStatement to 0 as well (fresh cycle)
   if(c.outstanding===0) c.lastStatement=0;
+  // Also deduct from the source debit account
+  const fromAcct = state.accounts.find(a=>a.id===fromId);
+  if(fromAcct) fromAcct.balance = fromAcct.balance - amt;
   save(); acctUI.paymentCCId=null; render();
 };
 // Compute current cycle spending from transactions tagged to this CC
