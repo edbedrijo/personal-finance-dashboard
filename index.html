@@ -1056,7 +1056,7 @@ function renderNav() {
         <button onclick="setView('${k}')" style="background:none;border:none;border-bottom:2px solid ${currentView===k?'#6366f1':'transparent'};cursor:pointer;padding:8px 14px;font-size:13px;font-family:inherit;color:${currentView===k?'#e5e7eb':'#6b7280'};font-weight:${currentView===k?'600':'400'};white-space:nowrap;margin-bottom:-1px">${lbl}</button>`).join('')}
     </div>` : '<div class="mb-7"></div>';
   const firstName = currentUser
-    ? (currentUser.user_metadata?.full_name?.split(' ')[0] || currentUser.email?.split('@')[0] || 'there')
+    ? ((currentUser.user_metadata?.full_name?.split(' ')[0] || currentUser.email?.split('@')[0] || 'there').replace(/^./, c => c.toUpperCase()))
     : 'there';
   const hr = new Date().getHours();
   const timeGreeting = hr < 5 ? 'Good night' : hr < 12 ? 'Good morning' : hr < 17 ? 'Good afternoon' : hr < 21 ? 'Good evening' : 'Good night';
