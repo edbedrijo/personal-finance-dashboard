@@ -364,6 +364,7 @@ let recUI  = { showAddRec:false, editRecId:null, deleteRecId:null };
 let iconPickerUI = { targetId:null, anchorRect:null };
 let recAutoPostedCount = 0;
 let recurringChecked   = false;
+const _sessionSublineIndex = Math.floor(Math.random() * 20);
 
 // ═══════════════════════════════════════════════════════
 // UTILITIES
@@ -1083,8 +1084,7 @@ function renderNav() {
     "One dashboard, full financial picture.",
   ];
   // Seeded random by date so it changes daily but stays consistent within the day
-  const daySeed = new Date().getFullYear() * 1000 + Math.floor((new Date() - new Date(new Date().getFullYear(), 0, 0)) / 86400000);
-  const subline = sublines[daySeed % sublines.length];
+const subline = sublines[_sessionSublineIndex];
   const showGreeting = currentView === 'dashboard';
   return `
     ${showGreeting ? `
