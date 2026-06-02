@@ -9,22 +9,22 @@
 <style>
   /* ── Design Tokens ── */
   :root {
-    --bg:       #0e1014;
-    --surface:  #16191f;
-    --surface2: #1c2028;
-    --surface3: #242830;
-    --border:   rgba(255,255,255,0.08);
-    --border2:  rgba(255,255,255,0.05);
-    --text:     #f1f1f3;
-    --text-2:   #9ca3af;
-    --text-3:   #4b5563;
-    --indigo:   #6366f1;
-    --indigo-dim: rgba(99,102,241,0.14);
+    --bg:          #0e1014;
+    --surface:     #16191f;
+    --surface2:    #1c2028;
+    --surface3:    #242830;
+    --border:      rgba(255,255,255,0.08);
+    --border2:     rgba(255,255,255,0.05);
+    --text:        #f1f1f3;
+    --text-2:      #9ca3af;
+    --text-3:      #4b5563;
+    --indigo:      #6366f1;
+    --indigo-dim:  rgba(99,102,241,0.14);
     --indigo-glow: rgba(99,102,241,0.45);
-    --green:    #34d399;
-    --red:      #f87171;
-    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
-    --ease-in:  cubic-bezier(0.4, 0, 1, 1);
+    --green:       #34d399;
+    --red:         #f87171;
+    --ease-out:    cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-in:     cubic-bezier(0.4, 0, 1, 1);
   }
 
   html, body { overflow-x: hidden; }
@@ -53,8 +53,8 @@
     from { opacity: 0; }
     to   { opacity: 1; }
   }
-  @keyframes fade-up {
-    from { opacity: 0; transform: translateY(6px); }
+  @keyframes greeting-in {
+    from { opacity: 0; transform: translateY(10px); }
     to   { opacity: 1; transform: translateY(0); }
   }
   @keyframes toast-in {
@@ -63,6 +63,25 @@
   }
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  }
+
+  /* ── Greeting header ── */
+  .greeting-wrap {
+    animation: greeting-in 400ms var(--ease-out) both;
+    margin-bottom: 6px;
+  }
+  .greeting-time {
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--text);
+    line-height: 1.2;
+  }
+  .greeting-sub {
+    font-size: 13px;
+    color: var(--text-2);
+    margin-top: 3px;
+    line-height: 1.4;
   }
 
   /* ── Editable fields ── */
@@ -76,7 +95,7 @@
   .tab-btn.active { background: #fff !important; color: #0e1014 !important; font-weight: 600; }
   .tab-btn:active { transform: scale(0.97); }
 
-  /* ── Section / field labels ── */
+  /* ── Labels ── */
   .section-label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; color: var(--text-3); }
   .field-label { font-size: 11px; font-weight: 600; letter-spacing: 0.07em; color: var(--text-2); text-transform: uppercase; margin-bottom: 6px; }
 
@@ -97,7 +116,7 @@
   .cat-toggle { cursor: pointer; position: relative; flex-shrink: 0; border-radius: 11px; transition: background 0.2s ease; }
   .cat-toggle-knob { position: absolute; top: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: left 0.2s var(--ease-out); }
 
-  /* ── Chips (subcategory tags) ── */
+  /* ── Chips ── */
   .chip { display: inline-flex; align-items: center; gap: 5px; background: var(--surface2); border: 1px solid var(--border); border-radius: 99px; padding: 3px 10px; font-size: 12px; color: var(--text); }
   .chip.off { background: transparent; border-color: var(--border2); opacity: 0.4; }
   .chip-btn { background: none; border: none; color: var(--text-3); cursor: pointer; font-size: 12px; padding: 0 1px; line-height: 1; transition: color 0.12s ease; }
@@ -113,17 +132,9 @@
     box-sizing: border-box; -webkit-appearance: none; appearance: none;
     transition: border-color 0.15s ease, box-shadow 0.15s ease;
   }
-  .field-input:focus {
-    border-color: var(--indigo);
-    box-shadow: 0 0 0 3px rgba(99,102,241,0.15);
-  }
-  input[type="date"].field-input {
-    text-align: left; color: var(--text); color-scheme: dark;
-    background: var(--surface2); border-color: var(--border);
-  }
-  input[type="date"].field-input::-webkit-calendar-picker-indicator {
-    filter: brightness(0) invert(1); opacity: 0.6; cursor: pointer; padding: 2px;
-  }
+  .field-input:focus { border-color: var(--indigo); box-shadow: 0 0 0 3px rgba(99,102,241,0.15); }
+  input[type="date"].field-input { text-align: left; color: var(--text); color-scheme: dark; background: var(--surface2); }
+  input[type="date"].field-input::-webkit-calendar-picker-indicator { filter: brightness(0) invert(1); opacity: 0.6; cursor: pointer; padding: 2px; }
   .field-select {
     width: 100%; background: var(--surface2); border: 1px solid var(--border);
     border-radius: 10px; color: var(--text); outline: none;
@@ -131,10 +142,7 @@
     box-sizing: border-box; appearance: none;
     transition: border-color 0.15s ease, box-shadow 0.15s ease;
   }
-  .field-select:focus {
-    border-color: var(--indigo);
-    box-shadow: 0 0 0 3px rgba(99,102,241,0.15);
-  }
+  .field-select:focus { border-color: var(--indigo); box-shadow: 0 0 0 3px rgba(99,102,241,0.15); }
 
   /* ── Transaction rows ── */
   .tx-row {
@@ -145,35 +153,17 @@
   }
   .tx-row:last-child { border-bottom: none; }
   .tx-row:hover { background: rgba(255,255,255,0.03); }
-  .tx-icon {
-    width: 36px; height: 36px; border-radius: 10px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 16px; flex-shrink: 0; background: var(--surface3);
-  }
-
-  /* ── Cards ── */
-  .card {
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: 14px; padding: 18px 20px;
-    transition: border-color 0.15s ease;
-  }
-  .card:hover { border-color: rgba(255,255,255,0.13); }
+  .tx-icon { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; background: var(--surface3); }
 
   /* ── Buttons ── */
   button { transition: transform 0.08s ease, box-shadow 0.12s ease, background 0.12s ease, opacity 0.12s ease; }
   button:active { transform: scale(0.97); }
   button:disabled { opacity: 0.45; cursor: not-allowed; }
 
-  /* ── Modal / Drawer ── */
-  .modal-overlay {
-    animation: overlay-in 180ms ease forwards;
-  }
-  .modal-sheet-mobile {
-    animation: modal-in-mobile 320ms var(--ease-out) forwards;
-  }
-  .modal-sheet-desktop {
-    animation: modal-in-desktop 220ms var(--ease-out) forwards;
-  }
+  /* ── Modal ── */
+  .modal-overlay { animation: overlay-in 180ms ease forwards; }
+  .modal-sheet-mobile { animation: modal-in-mobile 320ms var(--ease-out) forwards; }
+  .modal-sheet-desktop { animation: modal-in-desktop 220ms var(--ease-out) forwards; }
 
   /* ── Bottom Navigation Bar ── */
   .bottom-nav {
@@ -192,12 +182,7 @@
   }
   .bnav-item:active { transform: scale(0.92); }
   .bnav-item.active { color: #a5b4fc; }
-  .bnav-pill {
-    position: absolute; top: 4px; left: 50%; transform: translateX(-50%);
-    width: 52px; height: 30px; border-radius: 10px;
-    background: var(--indigo-dim); transition: opacity 0.15s var(--ease-out);
-    opacity: 0; pointer-events: none;
-  }
+  .bnav-pill { position: absolute; top: 4px; left: 50%; transform: translateX(-50%); width: 52px; height: 30px; border-radius: 10px; background: var(--indigo-dim); transition: opacity 0.15s var(--ease-out); opacity: 0; pointer-events: none; }
   .bnav-item.active .bnav-pill { opacity: 1; }
   .bnav-icon { font-size: 20px; line-height: 1; position: relative; z-index: 1; }
   .bnav-label { font-size: 10px; font-weight: 500; position: relative; z-index: 1; white-space: nowrap; }
@@ -688,9 +673,9 @@ window.txSave = () => {
     adjustAccount(accId, type, amt, +1);
     if (type==='transfer') adjustTransferDest(toAccId, amt, +1);
   }
-  const wasEdit = !!txUI.editId;
+  const _wasEdit = !!txUI.editId;
   save(); txUI.showModal=false; txUI.editId=null; render();
-  showToast(wasEdit ? "✓ Transaction updated" : "✓ Transaction saved", "success");
+  showToast(_wasEdit ? "✓ Transaction updated" : "✓ Transaction saved", "success");
 };
 
 // ── CC outstanding auto-adjustment ──────────────────────
@@ -1068,10 +1053,45 @@ function renderNav() {
   const subNav = inTxSection ? `
     <div class="flex border-b mb-5" style="border-color:rgba(255,255,255,0.05);margin-top:0">
       ${[['transactions','Transactions'],['categories','Categories'],['recurring','Recurring']].map(([k,lbl])=>`
-        <button onclick="setView('${k}')" style="background:none;border:none;border-bottom:2px solid ${currentView===k?'#6366f1':'transparent'};cursor:pointer;padding:8px 14px;font-size:13px;font-family:inherit;color:${currentView===k?'#f1f1f3':'#6b7280'};font-weight:${currentView===k?'600':'400'};white-space:nowrap;margin-bottom:-1px;transition:color 0.15s ease,border-color 0.15s ease">${lbl}</button>`).join('')}
+        <button onclick="setView('${k}')" style="background:none;border:none;border-bottom:2px solid ${currentView===k?'#6366f1':'transparent'};cursor:pointer;padding:8px 14px;font-size:13px;font-family:inherit;color:${currentView===k?'#e5e7eb':'#6b7280'};font-weight:${currentView===k?'600':'400'};white-space:nowrap;margin-bottom:-1px">${lbl}</button>`).join('')}
     </div>` : '<div class="mb-7"></div>';
+  const firstName = currentUser
+    ? (currentUser.user_metadata?.full_name?.split(' ')[0] || currentUser.email?.split('@')[0] || 'there')
+    : 'there';
+  const hr = new Date().getHours();
+  const timeGreeting = hr < 5 ? 'Good night' : hr < 12 ? 'Good morning' : hr < 17 ? 'Good afternoon' : hr < 21 ? 'Good evening' : 'Good night';
+  const sublines = [
+    "See how much money you have today.",
+    "Let's check where your money went.",
+    "Your finances at a glance — all yours.",
+    "Every peso accounted for.",
+    "Small habits, big results. Keep tracking.",
+    "Money clarity starts here.",
+    "Stay on top of your spending today.",
+    "Let's make sure your budget's on track.",
+    "Your net worth, updated and honest.",
+    "Know your numbers, own your future.",
+    "Check in — your wallet will thank you.",
+    "Awareness is the first step to saving more.",
+    "A quick look at your financial health.",
+    "Where did it all go? Let's find out.",
+    "You're doing great — let's keep it that way.",
+    "Spending smart starts with looking back.",
+    "Money managed is stress relieved.",
+    "Your cash flow, crystal clear.",
+    "See what's in, what's out, what's left.",
+    "One dashboard, full financial picture.",
+  ];
+  // Seeded random by date so it changes daily but stays consistent within the day
+  const daySeed = new Date().getFullYear() * 1000 + Math.floor((new Date() - new Date(new Date().getFullYear(), 0, 0)) / 86400000);
+  const subline = sublines[daySeed % sublines.length];
+  const showGreeting = currentView === 'dashboard';
   return `
-    <div class="flex items-center gap-2 text-2xl font-bold mb-2 cursor-pointer select-none" onclick="setView('dashboard')" title="Back to Dashboard" style="letter-spacing:-0.02em">💰 Personal Finance</div>
+    ${showGreeting ? `
+    <div class="greeting-wrap">
+      <div class="greeting-time">${timeGreeting}, ${firstName}. 👋</div>
+      <div class="greeting-sub">${subline}</div>
+    </div>` : `<div class="flex items-center gap-2 text-lg font-bold mb-2 cursor-pointer select-none" onclick="setView('dashboard')" title="Back to Dashboard" style="color:#f1f1f3;letter-spacing:-0.01em">💰 Personal Finance</div>`}
     <div class="top-nav-wrap">
       <nav class="nav-scroll flex gap-1 text-sm mb-0" style="padding-bottom:10px;border-bottom:1px solid rgba(255,255,255,0.06)">
         ${items.map(([k,ic,lbl])=>`<span class="nav-item ${isActive(k)?'active':''}" onclick="setView('${k}')" style="${isActive(k)?'':'color:#6b7280'}">${ic} ${lbl}</span>`).join('')}
@@ -1242,7 +1262,7 @@ function renderTransactions() {
         <div id="tx-error" class="text-red-400 text-xs mb-3"></div>
 
         <div class="flex gap-3">
-          <button onclick="txSave()" class="flex-1 rounded-xl py-3 font-semibold text-white text-sm" style="background:#6366f1;border:none;cursor:pointer;box-shadow:0 2px 12px rgba(99,102,241,0.4);letter-spacing:0.01em">${isEdit?'Update Transaction':'Save Transaction'}</button>
+          <button onclick="txSave()" class="flex-1 rounded-xl py-3 font-semibold text-white text-sm" style="background:#6366f1;border:none;cursor:pointer;box-shadow:0 2px 12px rgba(99,102,241,0.35);letter-spacing:0.01em">${isEdit?'Update Transaction':'Save Transaction'}</button>
           <button onclick="txCloseModal()" class="flex-1 rounded-xl py-3 text-sm" style="background:#16191f;border:1px solid rgba(255,255,255,0.08);color:#9ca3af;cursor:pointer">Cancel</button>
         </div>
       </div>
@@ -2677,43 +2697,32 @@ async function initAuth() {
 
 initAuth();
 
-// ── Toast notification (Sonner-style) ──────────────────
-window.showToast = function(message, type = "success", duration = 3000) {
+// ── Toast notification (Sonner-style) ──────────────────────────────────────
+window.showToast = function(message, type, duration) {
+  type = type || "success"; duration = duration || 3000;
   const container = document.getElementById("toast-container");
   if (!container) return;
-  const id = "toast-" + Date.now();
   const colors = {
-    success: { bg: "#1c2028", border: "rgba(52,211,153,0.35)", icon: "✓", iconColor: "#34d399" },
-    error:   { bg: "#1c2028", border: "rgba(248,113,113,0.35)", icon: "✕", iconColor: "#f87171" },
-    info:    { bg: "#1c2028", border: "rgba(99,102,241,0.35)",  icon: "ℹ", iconColor: "#a5b4fc" },
+    success: { bg:"#1c2028", border:"rgba(52,211,153,0.35)", icon:"✓", iconColor:"#34d399" },
+    error:   { bg:"#1c2028", border:"rgba(248,113,113,0.35)", icon:"✕", iconColor:"#f87171" },
+    info:    { bg:"#1c2028", border:"rgba(99,102,241,0.35)",  icon:"ℹ", iconColor:"#a5b4fc" },
   };
   const c = colors[type] || colors.success;
   const el = document.createElement("div");
-  el.id = id;
-  el.style.cssText = `
-    display:flex;align-items:center;gap:10px;
-    background:${c.bg};border:1px solid ${c.border};
-    border-radius:12px;padding:12px 16px;
-    font-size:13px;font-weight:500;color:#f1f1f3;
-    box-shadow:0 4px 20px rgba(0,0,0,0.4);
-    pointer-events:all;cursor:default;
-    animation:toast-in 320ms cubic-bezier(0.16,1,0.3,1) forwards;
-    min-width:220px;max-width:320px;
-  `;
-  el.innerHTML = `<span style="width:20px;height:20px;border-radius:6px;background:${c.border};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:${c.iconColor};flex-shrink:0">${c.icon}</span><span>${message}</span>`;
+  el.style.cssText = "display:flex;align-items:center;gap:10px;background:" + c.bg + ";border:1px solid " + c.border + ";border-radius:12px;padding:12px 16px;font-size:13px;font-weight:500;color:#f1f1f3;box-shadow:0 4px 20px rgba(0,0,0,0.4);pointer-events:all;animation:toast-in 320ms cubic-bezier(0.16,1,0.3,1) forwards;min-width:220px;max-width:320px;";
+  el.innerHTML = '<span style="width:20px;height:20px;border-radius:6px;background:' + c.border + ';display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:' + c.iconColor + ';flex-shrink:0">' + c.icon + '</span><span>' + message + '</span>';
   container.appendChild(el);
-  setTimeout(() => {
-    el.style.animation = "none";
+  setTimeout(function() {
     el.style.transition = "opacity 200ms ease, transform 200ms ease";
     el.style.opacity = "0";
     el.style.transform = "translateY(6px)";
-    setTimeout(() => el.remove(), 210);
+    setTimeout(function() { el.remove(); }, 210);
   }, duration);
 };
 
 </script>
 
-<!-- ── Sonner-style Toast ── -->
-<div id="toast-container" style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:9999;display:flex;flex-direction:column-reverse;gap:8px;pointer-events:none;min-width:260px;max-width:340px"></div>
+<!-- Toast container -->
+<div id="toast-container" style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:9999;display:flex;flex-direction:column-reverse;gap:8px;pointer-events:none;min-width:260px;max-width:340px;align-items:center"></div>
 </body>
 </html>
