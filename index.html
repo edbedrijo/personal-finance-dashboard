@@ -17,7 +17,7 @@
     --border2:     rgba(255,255,255,0.05);
     --text:        #f1f1f3;
     --text-2:      #9ca3af;
-    --text-3:      #4b5563;
+    --text-3:      #6b7280;
     --indigo:      #6366f1;
     --indigo-dim:  rgba(99,102,241,0.14);
     --indigo-glow: rgba(99,102,241,0.45);
@@ -1141,7 +1141,7 @@ function renderTransactions() {
           <div class="tx-icon">${cat?.icon||'💸'}</div>
           <div class="flex-1 min-w-0">
             <div class="text-sm font-medium truncate" style="color:#f1f1f3">${tx.description}</div>
-            <div class="text-xs mt-0.5" style="color:#6b7280">${tx.type==='transfer'?`🔄 Transfer → ${findAccount(tx.toAccountId)?.name||'?'}`:cat?.name||''}${subcat?' · '+subcat.name:''}${(() => { const a=findAccount(tx.accountId); return a ? ` · <span style="color:${state.creditCards.find(c=>c.id===tx.accountId)?'#f59e0b':'#4b5563'}">${a.icon||''}${state.creditCards.find(c=>c.id===tx.accountId)?' CC':''} ${a.name}</span>` : ''; })()}</div>
+            <div class="text-xs mt-0.5" style="color:#6b7280">${tx.type==='transfer'?`🔄 Transfer → ${findAccount(tx.toAccountId)?.name||'?'}`:cat?.name||''}${subcat?' · '+subcat.name:''}${(() => { const a=findAccount(tx.accountId); return a ? ` · <span style="color:${state.creditCards.find(c=>c.id===tx.accountId)?'#f59e0b':'#6b7280'}">${a.icon||''}${state.creditCards.find(c=>c.id===tx.accountId)?' CC':''} ${a.name}</span>` : ''; })()}</div>
           </div>
           <div class="flex items-center gap-2 flex-shrink-0">
             <div class="text-sm font-semibold ${tx.type==='income'?'text-emerald-400':tx.type==='transfer'?'text-indigo-400':'text-red-400'}">
@@ -1380,7 +1380,7 @@ function renderCategories() {
       <button onclick="catSetTab('expense')" class="rounded-lg px-5 py-2 text-sm font-medium" style="${catUI.tab==='expense'?'background:#1c2028;color:#f1f1f3;border:1px solid rgba(255,255,255,0.08)':'background:transparent;color:#6b7280;border:1px solid transparent'}">💸 Expense (${expCount})</button>
       <button onclick="catSetTab('income')" class="rounded-lg px-5 py-2 text-sm font-medium" style="${catUI.tab==='income'?'background:#1c2028;color:#f1f1f3;border:1px solid rgba(255,255,255,0.08)':'background:transparent;color:#6b7280;border:1px solid transparent'}">💰 Income (${incCount})</button>
     </div>
-    <div class="text-xs mb-4" style="color:#4b5563">💡 Double-click to rename &nbsp;·&nbsp; Click emoji to change</div>
+    <div class="text-xs mb-4" style="color:#6b7280">💡 Double-click to rename &nbsp;·&nbsp; Click emoji to change</div>
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">${filtered.length===0?`<div class="col-span-2 text-center py-16" style="color:#6b7280"><div class="text-5xl mb-3">🗂️</div><div class="font-semibold mb-1" style="color:#9ca3af">No categories</div></div>`:cards}</div>
     ${modal}`;
 }
@@ -1394,7 +1394,7 @@ function renderPlaceholder(label, icon, note) {
       <div class="text-5xl mb-4">${icon}</div>
       <div class="text-xl font-bold mb-2">${label}</div>
       <div class="text-sm max-w-xs" style="color:#6b7280">${note}</div>
-      <div class="mt-5 text-xs px-4 py-2 rounded-full" style="color:#4b5563;border:1px solid rgba(255,255,255,0.05)">Coming soon</div>
+      <div class="mt-5 text-xs px-4 py-2 rounded-full" style="color:#6b7280;border:1px solid rgba(255,255,255,0.05)">Coming soon</div>
     </div>`;
 }
 
@@ -1749,12 +1749,12 @@ function renderRecurring() {
       <div class="rounded-2xl p-4" style="background:#1c2028">
         <div class="text-xs mb-1" style="color:#6b7280">Monthly Expenses</div>
         <div class="text-xl font-bold text-red-400">-${fmt2(monthlyExp)}</div>
-        <div class="text-xs mt-0.5" style="color:#4b5563">${active.filter(r=>r.type==='expense').length} items</div>
+        <div class="text-xs mt-0.5" style="color:#6b7280">${active.filter(r=>r.type==='expense').length} items</div>
       </div>
       <div class="rounded-2xl p-4" style="background:#1c2028">
         <div class="text-xs mb-1" style="color:#6b7280">Monthly Income</div>
         <div class="text-xl font-bold text-emerald-400">+${fmt2(monthlyInc)}</div>
-        <div class="text-xs mt-0.5" style="color:#4b5563">${active.filter(r=>r.type==='income').length} items</div>
+        <div class="text-xs mt-0.5" style="color:#6b7280">${active.filter(r=>r.type==='income').length} items</div>
       </div>
     </div>
 
@@ -1824,7 +1824,7 @@ function renderGoals() {
             <div class="text-sm font-semibold text-emerald-400">+${fmt(d.amount)}</div>
             <div class="text-xs truncate" style="color:#6b7280">${fmtDate(d.date)}${d.note?' · '+d.note:''}</div>
           </div>
-          <button onclick="goalAskDeleteDeposit('${g.id}','${d.id}')" style="background:none;border:none;color:#4b5563;cursor:pointer;font-size:18px;padding:0 4px;line-height:1;flex-shrink:0">×</button>
+          <button onclick="goalAskDeleteDeposit('${g.id}','${d.id}')" style="background:none;border:none;color:#6b7280;cursor:pointer;font-size:18px;padding:0 4px;line-height:1;flex-shrink:0">×</button>
         </div>`;
     }).join('');
 
@@ -1832,7 +1832,7 @@ function renderGoals() {
       <div class="mt-4 pt-4" style="border-top:1px solid rgba(255,255,255,0.08)">
         <div class="section-label mb-2">DEPOSIT HISTORY</div>
         ${deposits.length===0
-          ?`<div class="text-sm text-center py-3" style="color:#4b5563">No manual deposits yet.</div>`
+          ?`<div class="text-sm text-center py-3" style="color:#6b7280">No manual deposits yet.</div>`
           :historyRows}
       </div>`:'';
 
@@ -2054,7 +2054,7 @@ function renderAccounts() {
           </div>
         </div>
         ${list.map(a=>acctCard(a)).join('')}
-        ${list.length===0?`<div class="text-center py-4 text-sm" style="color:#4b5563">No ${title.toLowerCase()} added yet</div>`:''}
+        ${list.length===0?`<div class="text-center py-4 text-sm" style="color:#6b7280">No ${title.toLowerCase()} added yet</div>`:''}
       </div>`;
   }
 
@@ -2184,24 +2184,24 @@ function renderAccounts() {
           <div class="flex items-center gap-1 text-xs">
             <div class="text-center flex-1">
               <div style="color:#a5b4fc;font-weight:600">${startLabel}</div>
-              <div style="color:#4b5563;margin-top:1px">Cycle start</div>
+              <div style="color:#6b7280;margin-top:1px">Cycle start</div>
             </div>
             <div style="flex:2;height:2px;background:linear-gradient(90deg,#6366f1,${pastCutoff?'#6366f1':'rgba(255,255,255,0.05)'});border-radius:1px;position:relative">
               ${!pastCutoff?`<div style="position:absolute;top:-3px;width:8px;height:8px;border-radius:50%;background:#6366f1;left:${Math.min(95,Math.max(2,100-(daysToC/(daysToC+(now.getDate()-parseInt(dates.cycleStart?.split('-')[2]||1)+1||1))*100)))}%;transform:translateX(-50%)"></div>`:''}
             </div>
             <div class="text-center flex-1">
               <div style="color:${pastCutoff?'#34d399':nearCutoff?'#f87171':'#9ca3af'};font-weight:600">${cutoffLabel}</div>
-              <div style="color:#4b5563;margin-top:1px">Cut-off</div>
+              <div style="color:#6b7280;margin-top:1px">Cut-off</div>
             </div>
             <div style="flex:1;height:2px;background:${pastCutoff?'linear-gradient(90deg,#10b981,rgba(255,255,255,0.05))':'rgba(255,255,255,0.05)'};border-radius:1px"></div>
             <div class="text-center flex-1">
               <div style="color:${nearDue?'#f87171':'#9ca3af'};font-weight:600">${dueLabel}</div>
-              <div style="color:#4b5563;margin-top:1px">Due date</div>
+              <div style="color:#6b7280;margin-top:1px">Due date</div>
             </div>
           </div>
-          <div class="flex justify-between text-xs mt-2" style="color:#4b5563">
+          <div class="flex justify-between text-xs mt-2" style="color:#6b7280">
             <span>${pastCutoff?'Statement closed':'Charges here → this bill'}</span>
-            <span style="color:${nearDue?'#f87171':'#4b5563'}">${daysToD}d to pay</span>
+            <span style="color:${nearDue?'#f87171':'#6b7280'}">${daysToD}d to pay</span>
           </div>
         </div>
 
@@ -2213,7 +2213,7 @@ function renderAccounts() {
             <div class="flex items-start justify-between">
               <div>
                 <div class="text-sm font-bold text-amber-400">${fmt(c.lastStatement)}</div>
-                <div class="text-xs mt-0.5" style="color:#4b5563">Last billed amount</div>
+                <div class="text-xs mt-0.5" style="color:#6b7280">Last billed amount</div>
               </div>
               <div class="text-right">
                 ${stmtFullyPaid
@@ -2227,27 +2227,27 @@ function renderAccounts() {
             <div class="mt-2 rounded-full overflow-hidden" style="height:3px;background:rgba(255,255,255,0.08)">
               <div style="width:${Math.min(100,(stmtPayments/c.lastStatement)*100).toFixed(1)}%;height:3px;background:#34d399;border-radius:2px"></div>
             </div>`:''}`
-            :`<div class="text-sm font-bold" style="color:#4b5563">—</div>
-            <div class="text-xs mt-0.5" style="color:#4b5563">No statement set</div>`}
+            :`<div class="text-sm font-bold" style="color:#6b7280">—</div>
+            <div class="text-xs mt-0.5" style="color:#6b7280">No statement set</div>`}
           </div>
           <div class="rounded-lg p-3" style="background:#1c2028">
             <div class="text-xs mb-1" style="color:#6b7280">Current Balance</div>
             <div class="text-sm font-bold ${isPaid?'text-emerald-400':'text-red-400'}">${isPaid?'Paid ✓':fmt(c.outstanding)}</div>
-            <div class="text-xs mt-0.5" style="color:#4b5563">${newCharges>0?`+${fmt(newCharges)} new charges`:'No new charges'}</div>
+            <div class="text-xs mt-0.5" style="color:#6b7280">${newCharges>0?`+${fmt(newCharges)} new charges`:'No new charges'}</div>
           </div>
           <div class="rounded-lg p-3" style="background:#1c2028">
             <div class="text-xs mb-1" style="color:#6b7280">Available Credit</div>
-            <div class="text-sm font-bold text-emerald-400">${fmt(avail)}</div>
+            <div class="text-base font-bold text-emerald-400">${fmt(avail)}</div>
           </div>
-          <div class="rounded-lg p-3 col-span-2" style="background:#1c2028">
+          <div class="rounded-lg p-3" style="background:#1c2028">
             <div class="text-xs mb-1" style="color:#6b7280">Credit Limit</div>
-            <div class="text-sm font-bold">${fmt(c.limit)}</div>
+            <div class="text-base font-bold" style="color:#f1f1f3">${fmt(c.limit)}</div>
           </div>
         </div>
 
         ${c.minDue>0&&!isPaid?`
         <div class="flex items-center justify-between py-2 px-3 rounded-lg mb-3" style="background:rgba(245,158,11,0.06);border:1px solid rgba(245,158,11,0.2)">
-          <div class="text-xs" style="color:#9ca3af">⚠️ Minimum Amount Due <span style="color:#4b5563">· pay by ${dueLabel}</span></div>
+          <div class="text-xs" style="color:#9ca3af">⚠️ Minimum Amount Due <span style="color:#6b7280">· pay by ${dueLabel}</span></div>
           <div class="text-sm font-bold text-amber-400">${fmt(c.minDue)}</div>
         </div>`:''}
 
@@ -2345,7 +2345,7 @@ function renderAccounts() {
         </div>
       </div>
       ${state.creditCards.map(c=>ccCard(c)).join('')}
-      ${state.creditCards.length===0?`<div class="text-center py-4 text-sm" style="color:#4b5563">No credit cards added yet</div>`:''}
+      ${state.creditCards.length===0?`<div class="text-center py-4 text-sm" style="color:#6b7280">No credit cards added yet</div>`:''}
     </div>
     ${addAcctModal}${addCCModal}`;
 }
