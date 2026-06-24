@@ -810,10 +810,10 @@ window.ccRecordPayment = id => {
   const fromId = document.getElementById('cc-pay-from')?.value;
   const date  = document.getElementById('cc-pay-date')?.value || todayISO;
   if(isNaN(amt)||amt<=0){ document.getElementById('cc-pay-err').textContent='Enter a valid amount.'; return; }
-  // Log a transfer transaction: from debit account → CC (as a payment)
+  // Log as transfer (not expense) so it doesn't double-count spending
   state.transactions.push({
     id:'tx_'+Date.now(), date, description:`${c.name} Payment`,
-    type:'expense', amount:amt,
+    type:'transfer', amount:amt,
     categoryId:'', subcategoryId:'',
     accountId: fromId||'', toAccountId: id,
     notes:'CC payment'
@@ -1470,10 +1470,12 @@ function renderDashboard() {
   };
   const forecastIncome=forecastItems.income.reduce((s,r)=>s+r.amount,0);
   const forecastExpense=forecastItems.expense.reduce((s,r)=>s+r.amount,0);
-  // Also include CC due payments in forecast expenses
-  const ccForecastExp = (state.creditCards||[]).filter(c=>{
-    const due = new Date(now.getFullYear(),now.getMonth(),c.dueDay).toISOString().split('T')[0];
-    return due>=todayISO&&due<=forecastEnd&&c.outstanding>0;
+  // All CCs with outstanding balance — always shown so user never misses an obligation
+  const ccDueForecast = (state.creditCards||[]).filter(c=>c.outstanding>0);
+  // Only count toward "available" if due within the forecast window
+  const ccForecastExp = ccDueForecast.filter(c=>{
+    const dates = ccCycleDates(c.id);
+    return dates && dates.due >= todayISO && dates.due <= forecastEnd;
   }).reduce((s,c)=>s+c.outstanding,0);
   const available=spendable+forecastIncome-forecastExpense-ccForecastExp;
   // Compute vs Last Month dynamically
@@ -1568,7 +1570,7 @@ function renderDashboard() {
       ${forecastItems.income.length===0?`<div class="text-xs text-gray-700 py-1.5">None in this window</div>`:forecastItems.income.map(r=>`<div class="flex justify-between items-center py-1.5"><div class="text-sm flex items-center gap-2"><span>${r.icon}</span>${r.name}</div><div class="text-sm ${r.amount===0?'text-gray-700':'text-emerald-400'}">${r.amount===0?'—':'+ '+fmt(r.amount)}</div></div>`).join('')}
       <div class="text-xs text-gray-600 font-semibold tracking-wider mt-4 mb-2">SCHEDULED EXPENSES</div>
       ${forecastItems.expense.length===0&&ccForecastExp===0?`<div class="text-xs text-gray-700 py-1.5">None in this window</div>`:forecastItems.expense.map(r=>`<div class="flex justify-between items-center py-1.5"><div class="text-sm flex items-center gap-2"><span>${r.icon}</span>${r.name}</div><div class="text-sm text-red-400">− ${fmt(r.amount)}</div></div>`).join('')}
-      ${(state.creditCards||[]).filter(c=>{const due=new Date(now.getFullYear(),now.getMonth(),c.dueDay).toISOString().split('T')[0];return due>=todayISO&&due<=forecastEnd&&c.outstanding>0;}).map(c=>`<div class="flex justify-between items-center py-1.5"><div class="text-sm flex items-center gap-2"><span>💳</span>${c.name} payment <span class="text-xs text-amber-500 ml-1">due ${c.dueDay}${sfx(c.dueDay)}</span></div><div class="text-sm text-red-400">− ${fmt(c.outstanding)}</div></div>`).join('')}
+      ${ccDueForecast.map(c=>{ const dates=ccCycleDates(c.id); const inWindow=dates&&dates.due<=forecastEnd; return `<div class="flex justify-between items-center py-1.5"><div class="text-sm flex items-center gap-2"><span>💳</span>${c.name}<span class="text-xs ml-1" style="color:${inWindow?'#f59e0b':'#6b7280'}">due ${dates?fmtDateShort(dates.due):'—'}${inWindow?'':' · outside window'}</span></div><div class="text-sm" style="color:${inWindow?'#f87171':'#6b7280'}">− ${fmt(c.outstanding)}</div></div>`; }).join('')}
       <div class="flex justify-between items-center pt-4 mt-3 border-t border-gray-800"><span class="font-semibold">Available to spend</span><span class="text-lg font-bold ${available>=0?'text-emerald-400':'text-red-400'}">${fmt2(available)}</span></div>
     </div>
       <div class="flex items-center gap-2 mb-4"><span>🎯</span><span class="font-semibold">Financial Goals</span></div>
