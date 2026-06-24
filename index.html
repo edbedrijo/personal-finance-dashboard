@@ -327,6 +327,10 @@ function migrateState(p) {
     if (g.linkedSubcategoryId===undefined) g.linkedSubcategoryId='';
     delete g.status;
   });
+  // Fix legacy CC payment transactions recorded as expense — should be transfer
+  if (p.transactions) p.transactions.forEach(t => {
+    if (t.notes === 'CC payment' && t.type === 'expense') t.type = 'transfer';
+  });
   return p;
 }
 
