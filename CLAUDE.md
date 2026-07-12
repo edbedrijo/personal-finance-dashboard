@@ -34,7 +34,8 @@ Classic `<script>` tags loaded in dependency order — **NOT ES modules** (all h
 4. `js/render.js` — all `renderXxx()` view functions and the main `render()`
 5. `js/app.js` — auth (`initAuth()` boots the app), Supabase load/sync, CSV/JSON import/export, toasts
 
-- **`css/styles.css`**: CSS custom properties (design tokens), component styles, responsive breakpoints. Dark theme with `--bg`, `--surface`, `--indigo`, `--green`, `--red` variables. Minimum readable gray for secondary text is `#6b7280` (`--text-3`) — do NOT use darker grays like `#4b5563` for text; it was globally replaced for readability.
+- **`css/styles.css`**: "Marigold" design system — semantic tokens under `:root` (light, default) and `[data-theme="dark"]`. Accent is marigold `#ffb000` with ink text (`--on-accent`); income/expense stay green/red via `--green`/`--red`. **Never hardcode colors in JS templates — always `var(--token)`**, or the light/dark toggle breaks. Signature card look: `--card-border` + offset `box-shadow: 3px 4px 0 var(--card-shadow)` (applied automatically to `.bg-surface` / `background:var(--surface)` elements). Navigation is floating pill docks (top pill on desktop, bottom dock + FAB on mobile). Theme toggle: `toggleTheme()` (user menu), persisted in localStorage `pf_theme`, defaults to system preference.
+- **PH brand badges**: `PH_BRANDS` registry in `config.js` maps account/CC names (substring match) to brand-colored monogram badges via `brandBadge(name, fallbackEmoji)`. Add new banks there.
 - New code goes in the file matching its role; new load-order dependencies mean adding the script tag in the right position in `index.html`.
 
 ### Data Layer

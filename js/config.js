@@ -9,6 +9,57 @@ let syncTimeout = null;
 let isLoading   = true; // true until initAuth() resolves
 
 
+// ── Theme (light default / dark) — device preference, stored locally, not synced ──
+const THEME_KEY = 'pf_theme';
+(function initTheme() {
+  const saved = localStorage.getItem(THEME_KEY);
+  const prefersDark = window.matchMedia?.('(prefers-color-scheme: dark)')?.matches;
+  document.documentElement.dataset.theme = saved || (prefersDark ? 'dark' : 'light');
+})();
+window.toggleTheme = () => {
+  const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+  document.documentElement.dataset.theme = next;
+  try { localStorage.setItem(THEME_KEY, next); } catch(e) {}
+  render(); // refresh theme-dependent labels (e.g. the toggle button itself)
+};
+
+// ── PH bank / e-wallet brand registry — matched against account names.
+// Monogram badges in official brand colors (no logo CDN carries PH banks reliably).
+const PH_BRANDS = [
+  { abbr:'UB',   match:['unionbank','union bank'],        color:'#f26522' },
+  { abbr:'BPI',  match:['bpi'],                           color:'#b11116' },
+  { abbr:'BDO',  match:['bdo'],                           color:'#0038a8' },
+  { abbr:'MBT',  match:['metrobank','metro bank'],        color:'#0055a5' },
+  { abbr:'SB',   match:['security bank','securitybank'],  color:'#007a33' },
+  { abbr:'LBP',  match:['landbank','land bank'],          color:'#00703c' },
+  { abbr:'PNB',  match:['pnb','philippine national bank'],color:'#003da5' },
+  { abbr:'RCBC', match:['rcbc'],                          color:'#003b71' },
+  { abbr:'CBC',  match:['chinabank','china bank'],        color:'#c8102e' },
+  { abbr:'EW',   match:['eastwest','east west'],          color:'#5c2d91' },
+  { abbr:'PSB',  match:['psbank'],                        color:'#00539f' },
+  { abbr:'DBP',  match:['dbp'],                           color:'#0072bc' },
+  { abbr:'G',    match:['gcash'],                         color:'#007dfe' },
+  { abbr:'M',    match:['maya','paymaya'],                color:'#00a75c' },
+  { abbr:'MARI', match:['maribank','mari bank'],          color:'#00b14f' },
+  { abbr:'SEA',  match:['seabank','sea bank'],            color:'#ee4d2d' },
+  { abbr:'GT',   match:['gotyme','go tyme'],              color:'#00a5a8' },
+  { abbr:'CIMB', match:['cimb'],                          color:'#ed1c24' },
+  { abbr:'TNK',  match:['tonik'],                         color:'#7a28ff' },
+  { abbr:'KMO',  match:['komo'],                          color:'#0057ff' },
+];
+const brandFor = name => {
+  const n = (name||'').toLowerCase();
+  return PH_BRANDS.find(b => b.match.some(m => n.includes(m))) || null;
+};
+// Fills its parent tile (parent needs fixed size + border-radius); falls back to emoji
+const brandBadge = (name, fallback) => {
+  const b = brandFor(name);
+  if (!b) return fallback;
+  const fs = b.abbr.length >= 4 ? 8 : b.abbr.length === 3 ? 11 : 14;
+  const ls = b.abbr.length >= 4 ? '0' : '0.03em';
+  return `<span style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;border-radius:inherit;background:${b.color};color:#fff;font-size:${fs}px;font-weight:800;letter-spacing:${ls};line-height:1">${b.abbr}</span>`;
+};
+
 const STORAGE_KEY = 'pf_v2';
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const now = new Date();

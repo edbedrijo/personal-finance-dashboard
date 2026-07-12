@@ -66,11 +66,11 @@ window.txOpenEdit   = id  => { txUI.editId=id; txUI.showModal=true; txUI.deleteI
 window.txCloseModal = () => { txUI.showModal=false; txUI.editId=null; render(); };
 window.txSetType    = t   => {
   const inp = document.getElementById('tx-type'); if (inp) inp.value = t;
-  const colors = {income:'#34d399', expense:'#f87171', transfer:'#a5b4fc'};
+  const colors = {income:'var(--green)', expense:'var(--red)', transfer:'var(--accent-text)'};
   ['expense','income','transfer'].forEach(k => {
     const btn = document.getElementById('btn-'+k); if (!btn) return;
-    if (k===t) { btn.style.background='#1c2028'; btn.style.borderColor='rgba(255,255,255,0.08)'; btn.style.color=colors[k]; }
-    else       { btn.style.background='transparent'; btn.style.borderColor='transparent'; btn.style.color='#6b7280'; }
+    if (k===t) { btn.style.background='var(--surface)'; btn.style.borderColor='var(--border)'; btn.style.color=colors[k]; }
+    else       { btn.style.background='transparent'; btn.style.borderColor='transparent'; btn.style.color='var(--text-3)'; }
   });
   const isTransfer = t==='transfer';
   const catWrap   = document.getElementById('tx-cat-wrap');
@@ -474,17 +474,17 @@ window.iconPickerOpen = (inputId, setKey='general') => {
   overlay.id = 'icon-picker-overlay';
   overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:flex-end;justify-content:center;background:rgba(0,0,0,0.6)';
   overlay.innerHTML = `
-    <div style="width:100%;max-width:420px;background:#1c2028;border-radius:20px 20px 0 0;padding:20px;border:1px solid rgba(255,255,255,0.08);border-bottom:none" onclick="event.stopPropagation()">
+    <div style="width:100%;max-width:420px;background:var(--surface);border-radius:20px 20px 0 0;padding:20px;border:1px solid var(--border);border-bottom:none" onclick="event.stopPropagation()">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
-        <div style="font-weight:600;font-size:14px;color:#f1f1f3">Choose Icon</div>
-        <button onclick="iconPickerClose()" style="background:none;border:none;color:#6b7280;cursor:pointer;font-size:22px;line-height:1">×</button>
+        <div style="font-weight:600;font-size:14px;color:var(--text)">Choose Icon</div>
+        <button onclick="iconPickerClose()" style="background:none;border:none;color:var(--text-3);cursor:pointer;font-size:22px;line-height:1">×</button>
       </div>
       <div style="display:grid;grid-template-columns:repeat(8,1fr);gap:8px;margin-bottom:12px">
-        ${icons.map(ic=>`<button onclick="iconPickerSelect('${inputId}','${ic}')" style="background:#16191f;border:2px solid ${inp&&inp.value===ic?'#6366f1':'transparent'};border-radius:10px;padding:8px;font-size:22px;cursor:pointer;line-height:1;transition:border-color 0.1s" onmouseover="this.style.background='rgba(255,255,255,0.08)'" onmouseout="this.style.background='#16191f'">${ic}</button>`).join('')}
+        ${icons.map(ic=>`<button onclick="iconPickerSelect('${inputId}','${ic}')" style="background:var(--surface2);border:2px solid ${inp&&inp.value===ic?'var(--accent)':'transparent'};border-radius:10px;padding:8px;font-size:22px;cursor:pointer;line-height:1;transition:border-color 0.1s" onmouseover="this.style.background='var(--btn-ghost)'" onmouseout="this.style.background='var(--surface2)'">${ic}</button>`).join('')}
       </div>
       <div style="display:flex;gap:8px;align-items:center">
-        <input id="icon-picker-custom" placeholder="Or type/paste any emoji…" value="${inp?inp.value:''}" style="flex:1;background:#16191f;border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:10px 12px;color:#f1f1f3;font-size:16px;font-family:inherit" oninput="iconPickerPreview(this.value)">
-        <button onclick="iconPickerApplyCustom('${inputId}')" style="background:#6366f1;border:none;border-radius:10px;padding:10px 16px;color:#fff;font-size:13px;font-weight:600;cursor:pointer">Use</button>
+        <input id="icon-picker-custom" placeholder="Or type/paste any emoji…" value="${inp?inp.value:''}" style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--text);font-size:16px;font-family:inherit" oninput="iconPickerPreview(this.value)">
+        <button onclick="iconPickerApplyCustom('${inputId}')" style="background:var(--accent);border:none;border-radius:10px;padding:10px 16px;color:#fff;font-size:13px;font-weight:600;cursor:pointer">Use</button>
       </div>
       <div id="icon-preview" style="text-align:center;font-size:40px;margin-top:10px;min-height:50px">${inp?inp.value:''}</div>
     </div>`;

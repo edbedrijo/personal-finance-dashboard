@@ -111,12 +111,12 @@ function getMonthlyData() {
     if (!t.categoryId) return;
     catMap[t.categoryId] = (catMap[t.categoryId]||0) + t.amount;
   });
-  const palette = ['#6366f1','#f59e0b','#10b981','#3b82f6','#ec4899','#8b5cf6','#06b6d4'];
+  const palette = ['var(--accent)','var(--amber)','var(--green-strong)','#3b82f6','#ec4899','#8b5cf6','#06b6d4'];
   const topCats = Object.entries(catMap)
     .sort((a,b)=>b[1]-a[1]).slice(0,5)
     .map(([cid,amt],i) => {
       const cat = state.categories.find(c=>c.id===cid);
-      return { id:'mc_'+cid, name:cat?.name||'Other', icon:cat?.icon||'❓', amount:Math.round(amt), color:palette[i]||'#6b7280' };
+      return { id:'mc_'+cid, name:cat?.name||'Other', icon:cat?.icon||'❓', amount:Math.round(amt), color:palette[i]||'var(--text-3)' };
     });
   return { ...fallbackMonthly, label: currentMonthLabel, income, expenses, categories: topCats.length ? topCats : fallbackMonthly.categories };
 }

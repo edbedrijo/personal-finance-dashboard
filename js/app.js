@@ -3,8 +3,8 @@
 // ═══════════════════════════════════════════════════════
 function renderLoadingScreen() {
   return `<div style="min-height:80vh;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px">
-    <div style="width:40px;height:40px;border:3px solid rgba(255,255,255,0.08);border-top-color:#6366f1;border-radius:50%;animation:spin 0.8s linear infinite"></div>
-    <div style="color:#6b7280;font-size:14px">Loading your data...</div>
+    <div style="width:40px;height:40px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite"></div>
+    <div style="color:var(--text-3);font-size:14px">Loading your data...</div>
     <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
   </div>`;
 }
@@ -66,11 +66,11 @@ window.importCSV = () => {
     reader.onload = ev => {
       try {
         const rows = parseCSV(ev.target.result);
-        if (!rows.length) { setImportStatus('✗ File is empty or has no data rows.','#f87171'); return; }
+        if (!rows.length) { setImportStatus('✗ File is empty or has no data rows.','var(--red)'); return; }
         // Validate required columns
         const required = ['date','description','type','amount'];
         const missing  = required.filter(h=>!(h in rows[0]));
-        if (missing.length) { setImportStatus(`✗ Missing columns: ${missing.join(', ')}. See format guide below.`,'#f87171'); return; }
+        if (missing.length) { setImportStatus(`✗ Missing columns: ${missing.join(', ')}. See format guide below.`,'var(--red)'); return; }
 
         let added=0, skipped=0;
         rows.forEach(row => {
@@ -101,12 +101,12 @@ window.importCSV = () => {
           added++;
         });
 
-        if (added===0) { setImportStatus(`✗ No valid rows found. Check your column names and values.`,'#f87171'); return; }
+        if (added===0) { setImportStatus(`✗ No valid rows found. Check your column names and values.`,'var(--red)'); return; }
         save();
-        setImportStatus(`✓ Imported ${added} transactions${skipped?` (${skipped} skipped — invalid rows)`:''}.`,'#34d399');
+        setImportStatus(`✓ Imported ${added} transactions${skipped?` (${skipped} skipped — invalid rows)`:''}.`,'var(--green)');
         setTimeout(()=>{ currentView='transactions'; render(); }, 1500);
       } catch(err) {
-        setImportStatus('✗ Could not parse file. Make sure it is a valid CSV.','#f87171');
+        setImportStatus('✗ Could not parse file. Make sure it is a valid CSV.','var(--red)');
       }
     };
     reader.readAsText(file);
@@ -125,9 +125,9 @@ window.importData = () => {
       try {
         state = migrateState(JSON.parse(ev.target.result));
         save();
-        setImportStatus('✓ Backup restored successfully!','#34d399');
+        setImportStatus('✓ Backup restored successfully!','var(--green)');
         setTimeout(()=>render(), 1200);
-      } catch(err) { setImportStatus('✗ Invalid file.','#f87171'); }
+      } catch(err) { setImportStatus('✗ Invalid file.','var(--red)'); }
     };
     reader.readAsText(file);
   };
@@ -136,7 +136,7 @@ window.importData = () => {
 
 function setImportStatus(msg, color) {
   const el = document.getElementById('import-status');
-  if (el) { el.textContent=msg; el.style.color=color||'#34d399'; }
+  if (el) { el.textContent=msg; el.style.color=color||'var(--green)'; }
 }
 
 
@@ -210,11 +210,11 @@ function renderLoginScreen() {
       <div style="width:100%;max-width:360px;text-align:center">
 
         <div style="font-size:60px;margin-bottom:20px;line-height:1">💰</div>
-        <div style="font-size:28px;font-weight:700;color:#f1f1f3;margin-bottom:10px;letter-spacing:-0.02em">Personal Finance</div>
-        <div style="color:#9ca3af;font-size:14px;margin-bottom:40px;line-height:2">Track your money.<br>Reach your budget goals.<br>Synced everywhere.</div>
+        <div style="font-size:28px;font-weight:700;color:var(--text);margin-bottom:10px;letter-spacing:-0.02em">Personal Finance</div>
+        <div style="color:var(--text-2);font-size:14px;margin-bottom:40px;line-height:2">Track your money.<br>Reach your budget goals.<br>Synced everywhere.</div>
 
         <button id="google-btn" onclick="signInWithGoogle()"
-          style="width:100%;padding:15px 20px;border-radius:14px;background:#fff;border:none;cursor:pointer;
+          style="width:100%;padding:15px 20px;border-radius:14px;background:#fff;border:1.5px solid var(--card-border);box-shadow:3px 4px 0 var(--card-shadow);cursor:pointer;
                  display:flex;align-items:center;justify-content:center;gap:12px;font-size:15px;font-weight:600;
                  color:#1f2937;box-shadow:0 4px 24px rgba(0,0,0,0.4);transition:transform 0.12s ease,box-shadow 0.12s ease,opacity 0.12s ease;font-family:inherit"
           onmouseover="this.style.transform='scale(1.02)';this.style.boxShadow='0 6px 28px rgba(0,0,0,0.5)'"
@@ -228,17 +228,17 @@ function renderLoginScreen() {
           Continue with Google
         </button>
 
-        <div id="inapp-warning" style="display:none;margin-top:16px;background:#1c2028;border:1px solid #f59e0b;border-radius:12px;padding:14px 16px;text-align:left">
-          <div style="color:#f59e0b;font-weight:600;font-size:13px;margin-bottom:6px">⚠️ Open in Safari or Chrome</div>
-          <div style="color:#9ca3af;font-size:12px;line-height:1.6">Google login doesn't work inside Messenger or other in-app browsers.<br><br>
-            Copy this link and open it in <strong style="color:#c9cdd5">Safari</strong> or <strong style="color:#c9cdd5">Chrome</strong>:
+        <div id="inapp-warning" style="display:none;margin-top:16px;background:var(--surface);border:1px solid var(--amber);border-radius:12px;padding:14px 16px;text-align:left">
+          <div style="color:var(--amber);font-weight:600;font-size:13px;margin-bottom:6px">⚠️ Open in Safari or Chrome</div>
+          <div style="color:var(--text-2);font-size:12px;line-height:1.6">Google login doesn't work inside Messenger or other in-app browsers.<br><br>
+            Copy this link and open it in <strong style="color:var(--text-2)">Safari</strong> or <strong style="color:var(--text-2)">Chrome</strong>:
           </div>
-          <div style="margin-top:10px;background:#16191f;border-radius:8px;padding:10px;font-size:11px;color:#6366f1;word-break:break-all;font-family:monospace">${window.location.origin}</div>
+          <div style="margin-top:10px;background:var(--surface2);border-radius:8px;padding:10px;font-size:11px;color:var(--accent);word-break:break-all;font-family:monospace">${window.location.origin}</div>
           <button onclick="navigator.clipboard?.writeText(window.location.origin).then(()=>{this.textContent='✓ Copied!';setTimeout(()=>this.textContent='Copy Link',2000)})"
-            style="margin-top:10px;width:100%;padding:10px;border-radius:8px;background:#6366f1;border:none;color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">Copy Link</button>
+            style="margin-top:10px;width:100%;padding:10px;border-radius:8px;background:var(--accent);border:1px solid var(--card-border);color:var(--on-accent);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">Copy Link</button>
         </div>
 
-        <div style="margin-top:20px;color:#4b5563;font-size:12px">🔒 Your data is private and encrypted</div>
+        <div style="margin-top:20px;color:var(--text-3);font-size:12px">🔒 Your data is private and encrypted</div>
       </div>
     </div>`;
 }
@@ -250,18 +250,19 @@ function renderUserPill() {
   const avatar = currentUser.user_metadata?.avatar_url;
   return `
     <div style="position:fixed;top:12px;right:12px;z-index:300;display:flex;align-items:center;gap-8px">
-      <span id="sync-indicator" style="font-size:11px;color:#6b7280;opacity:0;transition:opacity 0.5s;margin-right:8px"></span>
-      <div style="display:flex;align-items:center;gap:8px;background:#1c2028;border:1px solid rgba(255,255,255,0.08);border-radius:999px;padding:4px 10px 4px 6px;cursor:pointer" onclick="document.getElementById('user-menu').classList.toggle('hidden')">
-        ${avatar ? `<img src="${avatar}" style="width:24px;height:24px;border-radius:50%;object-fit:cover">` : `<div style="width:24px;height:24px;border-radius:50%;background:#6366f1;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700">${name[0].toUpperCase()}</div>`}
-        <span style="font-size:12px;color:#c9cdd5;font-weight:500">${name}</span>
+      <span id="sync-indicator" style="font-size:11px;color:var(--text-3);opacity:0;transition:opacity 0.5s;margin-right:8px"></span>
+      <div style="display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--border);border-radius:999px;padding:4px 10px 4px 6px;cursor:pointer" onclick="document.getElementById('user-menu').classList.toggle('hidden')">
+        ${avatar ? `<img src="${avatar}" style="width:24px;height:24px;border-radius:50%;object-fit:cover">` : `<div style="width:24px;height:24px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700">${name[0].toUpperCase()}</div>`}
+        <span style="font-size:12px;color:var(--text-2);font-weight:500">${name}</span>
       </div>
-      <div id="user-menu" class="hidden" style="position:fixed;top:52px;right:12px;background:#1c2028;border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:8px;min-width:160px;z-index:400;box-shadow:0 8px 32px rgba(0,0,0,0.4)">
-        <div style="padding:8px 12px;color:#9ca3af;font-size:11px;border-bottom:1px solid rgba(255,255,255,0.08);margin-bottom:4px">${currentUser.email}</div>
-        <button onclick="importCSV()" style="width:100%;text-align:left;padding:8px 12px;border-radius:8px;background:none;border:none;color:#c9cdd5;font-size:13px;cursor:pointer" onmouseover="this.style.background='rgba(255,255,255,0.05)'" onmouseout="this.style.background='none'">📊 Import CSV</button>
-        <button onclick="exportCSV()" style="width:100%;text-align:left;padding:8px 12px;border-radius:8px;background:none;border:none;color:#c9cdd5;font-size:13px;cursor:pointer" onmouseover="this.style.background='rgba(255,255,255,0.05)'" onmouseout="this.style.background='none'">📥 Export CSV</button>
-        <button onclick="exportData()" style="width:100%;text-align:left;padding:8px 12px;border-radius:8px;background:none;border:none;color:#c9cdd5;font-size:13px;cursor:pointer" onmouseover="this.style.background='rgba(255,255,255,0.05)'" onmouseout="this.style.background='none'">💾 Backup (JSON)</button>
-        <div style="border-top:1px solid rgba(255,255,255,0.08);margin:4px 0"></div>
-        <button onclick="signOut()" style="width:100%;text-align:left;padding:8px 12px;border-radius:8px;background:none;border:none;color:#f87171;font-size:13px;cursor:pointer" onmouseover="this.style.background='rgba(255,255,255,0.05)'" onmouseout="this.style.background='none'">🚪 Sign Out</button>
+      <div id="user-menu" class="hidden" style="position:fixed;top:52px;right:12px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:8px;min-width:160px;z-index:400;box-shadow:0 8px 32px rgba(0,0,0,0.4)">
+        <div style="padding:8px 12px;color:var(--text-2);font-size:11px;border-bottom:1px solid var(--border);margin-bottom:4px">${currentUser.email}</div>
+        <button onclick="toggleTheme()" style="width:100%;text-align:left;padding:8px 12px;border-radius:8px;background:none;border:none;color:var(--text-2);font-size:13px;cursor:pointer" onmouseover="this.style.background='var(--hover)'" onmouseout="this.style.background='none'">${document.documentElement.dataset.theme==='dark'?'☀️ Light mode':'🌙 Dark mode'}</button>
+        <button onclick="importCSV()" style="width:100%;text-align:left;padding:8px 12px;border-radius:8px;background:none;border:none;color:var(--text-2);font-size:13px;cursor:pointer" onmouseover="this.style.background='var(--hover)'" onmouseout="this.style.background='none'">📊 Import CSV</button>
+        <button onclick="exportCSV()" style="width:100%;text-align:left;padding:8px 12px;border-radius:8px;background:none;border:none;color:var(--text-2);font-size:13px;cursor:pointer" onmouseover="this.style.background='var(--hover)'" onmouseout="this.style.background='none'">📥 Export CSV</button>
+        <button onclick="exportData()" style="width:100%;text-align:left;padding:8px 12px;border-radius:8px;background:none;border:none;color:var(--text-2);font-size:13px;cursor:pointer" onmouseover="this.style.background='var(--hover)'" onmouseout="this.style.background='none'">💾 Backup (JSON)</button>
+        <div style="border-top:1px solid var(--border);margin:4px 0"></div>
+        <button onclick="signOut()" style="width:100%;text-align:left;padding:8px 12px;border-radius:8px;background:none;border:none;color:var(--red);font-size:13px;cursor:pointer" onmouseover="this.style.background='var(--hover)'" onmouseout="this.style.background='none'">🚪 Sign Out</button>
       </div>
     </div>`;
 }
@@ -303,13 +304,13 @@ window.showToast = function(message, type, duration) {
   const container = document.getElementById("toast-container");
   if (!container) return;
   const colors = {
-    success: { bg:"#1c2028", border:"rgba(52,211,153,0.35)", icon:"✓", iconColor:"#34d399" },
-    error:   { bg:"#1c2028", border:"rgba(248,113,113,0.35)", icon:"✕", iconColor:"#f87171" },
-    info:    { bg:"#1c2028", border:"rgba(99,102,241,0.35)",  icon:"ℹ", iconColor:"#a5b4fc" },
+    success: { bg:"var(--surface)", border:"var(--green-dim)", icon:"✓", iconColor:"var(--green)" },
+    error:   { bg:"var(--surface)", border:"var(--red-dim)", icon:"✕", iconColor:"var(--red)" },
+    info:    { bg:"var(--surface)", border:"var(--accent-glow)",  icon:"ℹ", iconColor:"var(--accent-text)" },
   };
   const c = colors[type] || colors.success;
   const el = document.createElement("div");
-  el.style.cssText = "display:flex;align-items:center;gap:10px;background:" + c.bg + ";border:1px solid " + c.border + ";border-radius:12px;padding:12px 16px;font-size:13px;font-weight:500;color:#f1f1f3;box-shadow:0 4px 20px rgba(0,0,0,0.4);pointer-events:all;animation:toast-in 320ms cubic-bezier(0.16,1,0.3,1) forwards;min-width:220px;max-width:320px;";
+  el.style.cssText = "display:flex;align-items:center;gap:10px;background:" + c.bg + ";border:1px solid " + c.border + ";border-radius:12px;padding:12px 16px;font-size:13px;font-weight:500;color:var(--text);box-shadow:0 4px 20px rgba(0,0,0,0.4);pointer-events:all;animation:toast-in 320ms cubic-bezier(0.16,1,0.3,1) forwards;min-width:220px;max-width:320px;";
   el.innerHTML = '<span style="width:20px;height:20px;border-radius:6px;background:' + c.border + ';display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:' + c.iconColor + ';flex-shrink:0">' + c.icon + '</span><span>' + message + '</span>';
   container.appendChild(el);
   setTimeout(function() {

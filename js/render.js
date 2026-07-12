@@ -6,9 +6,9 @@ function renderNav() {
   const isActive = v => v==='dashboard' ? currentView==='dashboard' : v==='transactions' ? inTxSection : currentView===v;
   const items = [['dashboard','🏠','Home'],['transactions','💸','Transactions'],['accounts','🏦','Accounts'],['goals','🎯','Goals']];
   const subNav = inTxSection ? `
-    <div class="flex border-b mb-5" style="border-color:rgba(255,255,255,0.05);margin-top:0">
+    <div class="flex border-b mb-5" style="border-color:var(--border2);margin-top:0">
       ${[['transactions','Transactions'],['categories','Categories'],['recurring','Recurring']].map(([k,lbl])=>`
-        <button onclick="setView('${k}')" style="background:none;border:none;border-bottom:2px solid ${currentView===k?'#6366f1':'transparent'};cursor:pointer;padding:8px 14px;font-size:13px;font-family:inherit;color:${currentView===k?'#e5e7eb':'#6b7280'};font-weight:${currentView===k?'600':'400'};white-space:nowrap;margin-bottom:-1px">${lbl}</button>`).join('')}
+        <button onclick="setView('${k}')" style="background:none;border:none;border-bottom:2px solid ${currentView===k?'var(--accent)':'transparent'};cursor:pointer;padding:8px 14px;font-size:13px;font-family:inherit;color:${currentView===k?'var(--text)':'var(--text-3)'};font-weight:${currentView===k?'600':'400'};white-space:nowrap;margin-bottom:-1px">${lbl}</button>`).join('')}
     </div>` : '<div class="mb-7"></div>';
   const firstName = currentUser
     ? ((currentUser.user_metadata?.full_name?.split(' ')[0] || currentUser.email?.split('@')[0] || 'there').replace(/^./, c => c.toUpperCase()))
@@ -45,10 +45,10 @@ const subline = sublines[_sessionSublineIndex];
     <div class="greeting-wrap">
       <div class="greeting-time">${timeGreeting}, ${firstName}. 👋</div>
       <div class="greeting-sub">${subline}</div>
-    </div>` : `<div class="flex items-center gap-2 text-lg font-bold mb-2 cursor-pointer select-none" onclick="setView('dashboard')" title="Back to Dashboard" style="color:#f1f1f3;letter-spacing:-0.01em">💰 Personal Finance</div>`}
+    </div>` : `<div class="flex items-center gap-2 text-lg font-bold mb-2 cursor-pointer select-none" onclick="setView('dashboard')" title="Back to Dashboard" style="color:var(--text);letter-spacing:-0.01em">💰 Personal Finance</div>`}
     <div class="top-nav-wrap">
-      <nav class="nav-scroll flex gap-1 text-sm mb-0" style="padding-bottom:10px;border-bottom:1px solid rgba(255,255,255,0.06)">
-        ${items.map(([k,ic,lbl])=>`<span class="nav-item ${isActive(k)?'active':''}" onclick="setView('${k}')" style="${isActive(k)?'':'color:#6b7280'}">${ic} ${lbl}</span>`).join('')}
+      <nav class="nav-scroll nav-pill text-sm">
+        ${items.map(([k,ic,lbl])=>`<span class="nav-item ${isActive(k)?'active':''}" onclick="setView('${k}')" style="${isActive(k)?'':'color:var(--text-3)'}">${ic} ${lbl}</span>`).join('')}
       </nav>
     </div>
     ${subNav}`;
@@ -83,26 +83,26 @@ function renderTransactions() {
       const subcat = cat?.subs.find(s=>s.id===tx.subcategoryId);
       const isDeleting = txUI.deleteId === tx.id;
       if (isDeleting) return `
-        <div class="tx-row" style="background:#1a0f0f;border-radius:10px;padding:10px 12px;margin:4px 0;border:1px solid #7f1d1d">
-          <div class="flex-1 text-sm" style="color:#fca5a5">Delete <strong>${tx.description}</strong> (${fmt(tx.amount)})? This cannot be undone.</div>
+        <div class="tx-row" style="background:var(--danger-surface);border-radius:10px;padding:10px 12px;margin:4px 0;border:1px solid var(--danger-border)">
+          <div class="flex-1 text-sm" style="color:var(--danger-text)">Delete <strong>${tx.description}</strong> (${fmt(tx.amount)})? This cannot be undone.</div>
           <div class="flex gap-2 flex-shrink-0">
-            <button onclick="txConfirmDelete()" class="text-xs px-3 py-1.5 rounded-lg font-semibold" style="background:#ef4444;border:none;color:#fff;cursor:pointer">Delete</button>
-            <button onclick="txCancelDelete()" class="text-xs px-3 py-1.5 rounded-lg" style="background:rgba(255,255,255,0.08);border:none;color:#9ca3af;cursor:pointer">Cancel</button>
+            <button onclick="txConfirmDelete()" class="text-xs px-3 py-1.5 rounded-lg font-semibold" style="background:var(--red-strong);border:none;color:#fff;cursor:pointer">Delete</button>
+            <button onclick="txCancelDelete()" class="text-xs px-3 py-1.5 rounded-lg" style="background:var(--btn-ghost);border:none;color:var(--text-2);cursor:pointer">Cancel</button>
           </div>
         </div>`;
       return `
         <div class="tx-row">
           <div class="tx-icon">${cat?.icon||'💸'}</div>
           <div class="flex-1 min-w-0">
-            <div class="text-sm font-medium truncate" style="color:#f1f1f3">${tx.description}</div>
-            <div class="text-xs mt-0.5" style="color:#6b7280">${tx.type==='transfer'?`🔄 Transfer → ${findAccount(tx.toAccountId)?.name||'?'}`:cat?.name||''}${subcat?' · '+subcat.name:''}${(() => { const a=findAccount(tx.accountId); return a ? ` · <span style="color:${state.creditCards.find(c=>c.id===tx.accountId)?'#f59e0b':'#6b7280'}">${a.icon||''}${state.creditCards.find(c=>c.id===tx.accountId)?' CC':''} ${a.name}</span>` : ''; })()}</div>
+            <div class="text-sm font-medium truncate" style="color:var(--text)">${tx.description}</div>
+            <div class="text-xs mt-0.5" style="color:var(--text-3)">${tx.type==='transfer'?`🔄 Transfer → ${findAccount(tx.toAccountId)?.name||'?'}`:cat?.name||''}${subcat?' · '+subcat.name:''}${(() => { const a=findAccount(tx.accountId); return a ? ` · <span style="color:${state.creditCards.find(c=>c.id===tx.accountId)?'var(--amber)':'var(--text-3)'}">${a.icon||''}${state.creditCards.find(c=>c.id===tx.accountId)?' CC':''} ${a.name}</span>` : ''; })()}</div>
           </div>
           <div class="flex items-center gap-2 flex-shrink-0">
-            <div class="text-sm font-semibold ${tx.type==='income'?'text-emerald-400':tx.type==='transfer'?'text-indigo-400':'text-red-400'}">
+            <div class="text-sm font-semibold ${tx.type==='income'?'text-pos':tx.type==='transfer'?'text-accent':'text-neg'}">
               ${tx.type==='income'?'+':tx.type==='transfer'?'⇄':'-'}${fmt(tx.amount)}
             </div>
-            <button onclick="txOpenEdit('${tx.id}')" class="text-gray-600 hover:text-indigo-400 transition-colors text-sm leading-none" style="background:none;border:none;cursor:pointer;padding:2px 4px" title="Edit">✏️</button>
-            <button onclick="txAskDelete('${tx.id}')" class="text-gray-700 hover:text-red-400 transition-colors text-base leading-none" style="background:none;border:none;cursor:pointer;padding:2px 4px">×</button>
+            <button onclick="txOpenEdit('${tx.id}')" class="text-dimmer hover:text-accent transition-colors text-sm leading-none" style="background:none;border:none;cursor:pointer;padding:2px 4px" title="Edit">✏️</button>
+            <button onclick="txAskDelete('${tx.id}')" class="text-dimmer hover:text-neg transition-colors text-base leading-none" style="background:none;border:none;cursor:pointer;padding:2px 4px">×</button>
           </div>
         </div>`;
     }).join('');
@@ -150,18 +150,18 @@ function renderTransactions() {
         c.subs.filter(s=>s.active).map(s=>`<option value="${s.id}" ${s.id===initSubCat?'selected':''}>${s.name}</option>`).join('');
     })();
     const btnStyle = (t) => t===initType
-      ? `background:#1c2028;border:1px solid rgba(255,255,255,0.08);color:${t==='income'?'#34d399':t==='expense'?'#f87171':'#a5b4fc'}`
-      : 'background:transparent;border:1px solid transparent;color:#6b7280';
+      ? `background:var(--surface);border:1px solid var(--border);color:${t==='income'?'var(--green)':t==='expense'?'var(--red)':'var(--accent-text)'}`
+      : 'background:transparent;border:1px solid transparent;color:var(--text-3)';
     modalHtml = `
     <div class="modal-overlay fixed inset-0 flex items-end sm:items-center justify-center" style="z-index:200;background:rgba(0,0,0,0.75);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)" onclick="txCloseModal()">
-      <div class="w-full sm:w-96 rounded-t-3xl sm:rounded-2xl p-6" style="background:#1c2028;border:1px solid rgba(255,255,255,0.09);max-height:92vh;overflow-y:auto;box-shadow:0 -8px 40px rgba(0,0,0,0.4)" onclick="event.stopPropagation()">
+      <div class="w-full sm:w-96 rounded-t-3xl sm:rounded-2xl p-6" style="background:var(--surface);border:1px solid var(--border);max-height:92vh;overflow-y:auto;box-shadow:0 -8px 40px rgba(0,0,0,0.4)" onclick="event.stopPropagation()">
         <div class="flex items-center justify-between mb-5">
           <div class="text-lg font-bold">${isEdit?'Edit Transaction':'Add Transaction'}</div>
-          <button onclick="txCloseModal()" style="background:none;border:none;color:#6b7280;cursor:pointer;font-size:20px;line-height:1">×</button>
+          <button onclick="txCloseModal()" style="background:none;border:none;color:var(--text-3);cursor:pointer;font-size:20px;line-height:1">×</button>
         </div>
 
         <div class="field-label">TYPE</div>
-        <div class="inline-flex p-1 rounded-xl mb-4 gap-1 w-full" style="background:#16191f;border:1px solid rgba(255,255,255,0.05)">
+        <div class="inline-flex p-1 rounded-xl mb-4 gap-1 w-full" style="background:var(--surface2);border:1px solid var(--border2)">
           <button id="btn-expense"  onclick="txSetType('expense')"  class="flex-1 rounded-lg py-2 text-sm font-medium" style="${btnStyle('expense')}">💸 Expense</button>
           <button id="btn-income"   onclick="txSetType('income')"   class="flex-1 rounded-lg py-2 text-sm font-medium" style="${btnStyle('income')}">💰 Income</button>
           <button id="btn-transfer" onclick="txSetType('transfer')" class="flex-1 rounded-lg py-2 text-sm font-medium" style="${btnStyle('transfer')}">🔄 Transfer</button>
@@ -213,11 +213,11 @@ function renderTransactions() {
           <input id="tx-notes" type="text" placeholder="Optional notes..." value="${initNotes.replace(/"/g,'&quot;')}" class="field-input">
         </div>
 
-        <div id="tx-error" class="text-red-400 text-xs mb-3"></div>
+        <div id="tx-error" class="text-neg text-xs mb-3"></div>
 
         <div class="flex gap-3">
-          <button onclick="txSave()" class="flex-1 rounded-xl py-3 font-semibold text-white text-sm" style="background:#6366f1;border:none;cursor:pointer;box-shadow:0 2px 12px rgba(99,102,241,0.35);letter-spacing:0.01em">${isEdit?'Update Transaction':'Save Transaction'}</button>
-          <button onclick="txCloseModal()" class="flex-1 rounded-xl py-3 text-sm" style="background:#16191f;border:1px solid rgba(255,255,255,0.08);color:#9ca3af;cursor:pointer">Cancel</button>
+          <button onclick="txSave()" class="flex-1 rounded-xl py-3 font-semibold text-white text-sm" style="background:var(--accent);border:none;cursor:pointer;box-shadow:0 2px 12px var(--accent-glow);letter-spacing:0.01em">${isEdit?'Update Transaction':'Save Transaction'}</button>
+          <button onclick="txCloseModal()" class="flex-1 rounded-xl py-3 text-sm" style="background:var(--surface2);border:1px solid var(--border);color:var(--text-2);cursor:pointer">Cancel</button>
         </div>
       </div>
     </div>`;
@@ -229,23 +229,23 @@ function renderTransactions() {
     <div class="flex items-center justify-between mb-1">
       <div class="text-2xl font-bold">Transactions</div>
       <button onclick="txOpenModal()" class="rounded-xl px-4 py-2.5 text-sm font-semibold text-white flex-shrink-0"
-        style="background:#6366f1;border:none;cursor:pointer">+ Add</button>
+        style="background:var(--accent);border:none;cursor:pointer">+ Add</button>
     </div>
     <div class="section-label mb-5">${state.transactions.length} Total &nbsp;&middot;&nbsp; ${list.length} In View</div>
 
     <!-- Summary bar -->
     <div class="grid grid-cols-3 gap-3 mb-5">
-      <div class="rounded-xl p-3 text-center" style="background:#1c2028">
+      <div class="rounded-xl p-3 text-center" style="background:var(--surface)">
         <div class="section-label mb-1">INCOME</div>
-        <div class="font-bold text-emerald-400 text-sm">${fmt(totalIncome)}</div>
+        <div class="font-bold text-pos text-sm">${fmt(totalIncome)}</div>
       </div>
-      <div class="rounded-xl p-3 text-center" style="background:#1c2028">
+      <div class="rounded-xl p-3 text-center" style="background:var(--surface)">
         <div class="section-label mb-1">EXPENSES</div>
-        <div class="font-bold text-red-400 text-sm">${fmt(totalExpense)}</div>
+        <div class="font-bold text-neg text-sm">${fmt(totalExpense)}</div>
       </div>
-      <div class="rounded-xl p-3 text-center" style="background:#1c2028">
+      <div class="rounded-xl p-3 text-center" style="background:var(--surface)">
         <div class="section-label mb-1">NET</div>
-        <div class="font-bold text-sm ${net>=0?'text-emerald-400':'text-red-400'}">${net>=0?'+':''}${fmt(net)}</div>
+        <div class="font-bold text-sm ${net>=0?'text-pos':'text-neg'}">${net>=0?'+':''}${fmt(net)}</div>
       </div>
     </div>
 
@@ -253,17 +253,17 @@ function renderTransactions() {
     <div class="flex gap-2 mb-5 flex-wrap">
       ${filters.map(f=>`
         <button onclick="txSetFilter('${f}')" class="text-xs px-3 py-1.5 rounded-full transition-all"
-          style="${txUI.filter===f?'background:#6366f1;color:#fff;border:1px solid #6366f1':'background:#1c2028;color:#9ca3af;border:1px solid rgba(255,255,255,0.08)'}">
+          style="${txUI.filter===f?'background:var(--accent);color:#fff;border:1px solid var(--accent)':'background:var(--surface);color:var(--text-2);border:1px solid var(--border)'}">
           ${filterLabels[f]}
         </button>`).join('')}
     </div>
 
     <!-- Transaction list -->
-    <div class="rounded-2xl p-4" style="background:#1c2028">
+    <div class="rounded-2xl p-4" style="background:var(--surface)">
       ${list.length === 0
-        ? `<div class="text-center py-12" style="color:#6b7280">
+        ? `<div class="text-center py-12" style="color:var(--text-3)">
             <div class="text-4xl mb-3">💸</div>
-            <div class="font-semibold mb-1" style="color:#9ca3af">No transactions</div>
+            <div class="font-semibold mb-1" style="color:var(--text-2)">No transactions</div>
             <div class="text-sm">Click "+ Add" to log your first one.</div>
           </div>`
         : rowsHTML}
@@ -280,9 +280,9 @@ function renderCategories() {
   const activeCount=filtered.filter(c=>c.active).length;
   const cards=filtered.map(cat=>{
     const isExpanded=catUI.expanded===cat.id, activeSubs=cat.subs.filter(s=>s.active).length;
-    const toggleBg=cat.active?'#10b981':'rgba(255,255,255,0.08)', knobLeft=cat.active?'19px':'3px';
+    const toggleBg=cat.active?'var(--green-strong)':'var(--border)', knobLeft=cat.active?'19px':'3px';
     const subsSection=isExpanded?`
-      <div style="background:#16191f;border-top:1px solid rgba(255,255,255,0.05)" class="px-4 pt-3 pb-4 rounded-b-2xl">
+      <div style="background:var(--surface2);border-top:1px solid var(--border2)" class="px-4 pt-3 pb-4 rounded-b-2xl">
         <div class="section-label mb-2.5">SUBCATEGORIES — double-click to rename</div>
         <div class="flex flex-wrap gap-1.5 mb-3">
           ${cat.subs.map(s=>`<span class="chip${s.active?'':' off'}">
@@ -293,49 +293,49 @@ function renderCategories() {
         </div>
         <div class="flex gap-2 items-center">
           <input id="new-sub-${cat.id}" class="add-sub-input" placeholder="New subcategory…" onkeydown="if(event.key==='Enter')catAddSub('${cat.id}')">
-          <button onclick="catAddSub('${cat.id}')" class="text-xs px-3 py-1.5 rounded-full text-white font-semibold" style="background:#6366f1;border:none;cursor:pointer">Add</button>
+          <button onclick="catAddSub('${cat.id}')" class="text-xs px-3 py-1.5 rounded-full text-white font-semibold" style="background:var(--accent);border:none;cursor:pointer">Add</button>
         </div>
       </div>`:'' ;
-    return `<div class="rounded-2xl overflow-hidden" style="background:#1c2028;${cat.active?'':'opacity:0.5'}">
+    return `<div class="rounded-2xl overflow-hidden" style="background:var(--surface);${cat.active?'':'opacity:0.5'}">
       <div class="flex items-center gap-3 p-4">
-        <div id="cat-icon-${cat.id}" onclick="catStartRenameIcon('${cat.id}')" class="flex-shrink-0 flex items-center justify-center rounded-xl text-xl cursor-pointer" style="width:44px;height:44px;background:#16191f;border:1px solid rgba(255,255,255,0.05)">${cat.icon}</div>
+        <div id="cat-icon-${cat.id}" onclick="catStartRenameIcon('${cat.id}')" class="flex-shrink-0 flex items-center justify-center rounded-xl text-xl cursor-pointer" style="width:44px;height:44px;background:var(--surface2);border:1px solid var(--border2)">${cat.icon}</div>
         <div class="flex-1 min-w-0">
-          <div id="cat-name-${cat.id}" ondblclick="catStartRenameCategory('${cat.id}')" class="font-semibold text-sm truncate" style="color:#f1f1f3;cursor:text">${cat.name}</div>
-          <div class="text-xs mt-0.5" style="color:#6b7280">${activeSubs}/${cat.subs.length} subcategories</div>
+          <div id="cat-name-${cat.id}" ondblclick="catStartRenameCategory('${cat.id}')" class="font-semibold text-sm truncate" style="color:var(--text);cursor:text">${cat.name}</div>
+          <div class="text-xs mt-0.5" style="color:var(--text-3)">${activeSubs}/${cat.subs.length} subcategories</div>
         </div>
         <div class="flex items-center gap-3 flex-shrink-0">
           <div class="cat-toggle" onclick="catToggle('${cat.id}')" style="width:38px;height:22px;background:${toggleBg}"><div class="cat-toggle-knob" style="left:${knobLeft}"></div></div>
-          <button onclick="catToggleExpand('${cat.id}')" style="background:none;border:none;cursor:pointer;color:#9ca3af;font-size:20px;line-height:1;padding:0;transform:rotate(${isExpanded?'180':'0'}deg);transition:transform 0.2s">⌄</button>
+          <button onclick="catToggleExpand('${cat.id}')" style="background:none;border:none;cursor:pointer;color:var(--text-2);font-size:20px;line-height:1;padding:0;transform:rotate(${isExpanded?'180':'0'}deg);transition:transform 0.2s">⌄</button>
         </div>
       </div>${subsSection}</div>`;
   }).join('');
   const modal=catUI.showModal?`
     <div class="fixed inset-0 z-50 flex items-center justify-center" style="background:rgba(0,0,0,0.8)" onclick="catCloseModal()">
-      <div class="rounded-2xl p-7 w-80" style="background:#1c2028;border:1px solid rgba(255,255,255,0.08)" onclick="event.stopPropagation()">
+      <div class="rounded-2xl p-7 w-80" style="background:var(--surface);border:1px solid var(--border)" onclick="event.stopPropagation()">
         <div class="text-lg font-bold mb-1">New ${catUI.tab==='expense'?'Expense':'Income'} Category</div>
-        <div class="text-sm mb-5" style="color:#6b7280">Fill in the details below.</div>
+        <div class="text-sm mb-5" style="color:var(--text-3)">Fill in the details below.</div>
         <div class="section-label mb-1.5">EMOJI ICON</div>
-        <input id="modal-icon" placeholder="🗂️" class="w-full rounded-xl p-3 mb-4 text-2xl" style="background:#16191f;border:1px solid rgba(255,255,255,0.08);color:#f1f1f3;outline:none;font-family:inherit">
+        <input id="modal-icon" placeholder="🗂️" class="w-full rounded-xl p-3 mb-4 text-2xl" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);outline:none;font-family:inherit">
         <div class="section-label mb-1.5">CATEGORY NAME</div>
-        <input id="modal-name" placeholder="e.g. Education" onkeydown="if(event.key==='Enter')catAddFromModal();if(event.key==='Escape')catCloseModal()" class="w-full rounded-xl p-3 mb-6" style="background:#16191f;border:1px solid rgba(255,255,255,0.08);color:#f1f1f3;outline:none;font-size:15px;font-family:inherit">
+        <input id="modal-name" placeholder="e.g. Education" onkeydown="if(event.key==='Enter')catAddFromModal();if(event.key==='Escape')catCloseModal()" class="w-full rounded-xl p-3 mb-6" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);outline:none;font-size:15px;font-family:inherit">
         <div class="flex gap-3">
-          <button onclick="catAddFromModal()" class="flex-1 rounded-xl py-3 text-sm font-semibold text-white" style="background:#6366f1;border:none;cursor:pointer">Add Category</button>
-          <button onclick="catCloseModal()" class="flex-1 rounded-xl py-3 text-sm" style="background:#16191f;border:1px solid rgba(255,255,255,0.08);color:#9ca3af;cursor:pointer">Cancel</button>
+          <button onclick="catAddFromModal()" class="flex-1 rounded-xl py-3 text-sm font-semibold text-white" style="background:var(--accent);border:none;cursor:pointer">Add Category</button>
+          <button onclick="catCloseModal()" class="flex-1 rounded-xl py-3 text-sm" style="background:var(--surface2);border:1px solid var(--border);color:var(--text-2);cursor:pointer">Cancel</button>
         </div>
       </div>
     </div>`:'' ;
   return `${renderNav()}
     <div class="flex items-center justify-between mb-1">
       <div class="text-2xl font-bold">Categories</div>
-      <button onclick="catOpenModal()" class="rounded-xl px-4 py-2.5 text-sm font-semibold text-white flex-shrink-0" style="background:#6366f1;border:none;cursor:pointer">+ Add</button>
+      <button onclick="catOpenModal()" class="rounded-xl px-4 py-2.5 text-sm font-semibold text-white flex-shrink-0" style="background:var(--accent);border:none;cursor:pointer">+ Add</button>
     </div>
     <div class="section-label mb-5">${expCount} Expense &nbsp;&middot;&nbsp; ${incCount} Income &nbsp;&middot;&nbsp; ${activeCount} Active</div>
-    <div class="inline-flex p-1 rounded-xl mb-5 gap-1" style="background:#16191f;border:1px solid rgba(255,255,255,0.05)">
-      <button onclick="catSetTab('expense')" class="rounded-lg px-5 py-2 text-sm font-medium" style="${catUI.tab==='expense'?'background:#1c2028;color:#f1f1f3;border:1px solid rgba(255,255,255,0.08)':'background:transparent;color:#6b7280;border:1px solid transparent'}">💸 Expense (${expCount})</button>
-      <button onclick="catSetTab('income')" class="rounded-lg px-5 py-2 text-sm font-medium" style="${catUI.tab==='income'?'background:#1c2028;color:#f1f1f3;border:1px solid rgba(255,255,255,0.08)':'background:transparent;color:#6b7280;border:1px solid transparent'}">💰 Income (${incCount})</button>
+    <div class="inline-flex p-1 rounded-xl mb-5 gap-1" style="background:var(--surface2);border:1px solid var(--border2)">
+      <button onclick="catSetTab('expense')" class="rounded-lg px-5 py-2 text-sm font-medium" style="${catUI.tab==='expense'?'background:var(--surface);color:var(--text);border:1px solid var(--border)':'background:transparent;color:var(--text-3);border:1px solid transparent'}">💸 Expense (${expCount})</button>
+      <button onclick="catSetTab('income')" class="rounded-lg px-5 py-2 text-sm font-medium" style="${catUI.tab==='income'?'background:var(--surface);color:var(--text);border:1px solid var(--border)':'background:transparent;color:var(--text-3);border:1px solid transparent'}">💰 Income (${incCount})</button>
     </div>
-    <div class="text-xs mb-4" style="color:#6b7280">💡 Double-click to rename &nbsp;·&nbsp; Click emoji to change</div>
-    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">${filtered.length===0?`<div class="col-span-2 text-center py-16" style="color:#6b7280"><div class="text-5xl mb-3">🗂️</div><div class="font-semibold mb-1" style="color:#9ca3af">No categories</div></div>`:cards}</div>
+    <div class="text-xs mb-4" style="color:var(--text-3)">💡 Double-click to rename &nbsp;·&nbsp; Click emoji to change</div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">${filtered.length===0?`<div class="col-span-2 text-center py-16" style="color:var(--text-3)"><div class="text-5xl mb-3">🗂️</div><div class="font-semibold mb-1" style="color:var(--text-2)">No categories</div></div>`:cards}</div>
     ${modal}`;
 }
 
@@ -347,8 +347,8 @@ function renderPlaceholder(label, icon, note) {
     <div class="flex flex-col items-center justify-center py-24 text-center">
       <div class="text-5xl mb-4">${icon}</div>
       <div class="text-xl font-bold mb-2">${label}</div>
-      <div class="text-sm max-w-xs" style="color:#6b7280">${note}</div>
-      <div class="mt-5 text-xs px-4 py-2 rounded-full" style="color:#6b7280;border:1px solid rgba(255,255,255,0.05)">Coming soon</div>
+      <div class="text-sm max-w-xs" style="color:var(--text-3)">${note}</div>
+      <div class="mt-5 text-xs px-4 py-2 rounded-full" style="color:var(--text-3);border:1px solid var(--border2)">Coming soon</div>
     </div>`;
 }
 
@@ -362,36 +362,36 @@ function renderDashboard() {
       ${renderNav()}
       <div style="text-align:center;padding:60px 24px">
         <div style="font-size:56px;margin-bottom:16px">👋</div>
-        <div style="font-size:20px;font-weight:700;color:#f1f1f3;margin-bottom:8px">Welcome to Personal Finance</div>
-        <div style="color:#6b7280;font-size:14px;line-height:1.7;margin-bottom:32px">Get started by adding your bank accounts,<br>or import your existing data below.</div>
+        <div style="font-size:20px;font-weight:700;color:var(--text);margin-bottom:8px">Welcome to Personal Finance</div>
+        <div style="color:var(--text-3);font-size:14px;line-height:1.7;margin-bottom:32px">Get started by adding your bank accounts,<br>or import your existing data below.</div>
         <div style="display:flex;flex-direction:column;gap:12px;max-width:300px;margin:0 auto">
-          <button onclick="setView('accounts')" style="padding:14px;border-radius:12px;background:#6366f1;border:none;color:#fff;font-size:14px;font-weight:600;cursor:pointer">🏦 Add My Accounts</button>
-          <button onclick="showImportPanel()" style="padding:14px;border-radius:12px;background:#1c2028;border:1px solid rgba(255,255,255,0.08);color:#c9cdd5;font-size:14px;font-weight:600;cursor:pointer">📥 Import Existing Data</button>
+          <button onclick="setView('accounts')" style="padding:14px;border-radius:12px;background:var(--accent);border:none;color:#fff;font-size:14px;font-weight:600;cursor:pointer">🏦 Add My Accounts</button>
+          <button onclick="showImportPanel()" style="padding:14px;border-radius:12px;background:var(--surface);border:1px solid var(--border);color:var(--text-2);font-size:14px;font-weight:600;cursor:pointer">📥 Import Existing Data</button>
         </div>
-        <div id="import-panel" style="display:none;margin-top:24px;background:#1c2028;border:1px solid rgba(255,255,255,0.08);border-radius:16px;padding:20px;text-align:left">
-          <div style="font-weight:600;margin-bottom:4px;color:#f1f1f3">Import Your Data</div>
-          <div style="color:#6b7280;font-size:12px;margin-bottom:16px">CSV is the easiest — works from Excel, Google Sheets, or any app</div>
+        <div id="import-panel" style="display:none;margin-top:24px;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:20px;text-align:left">
+          <div style="font-weight:600;margin-bottom:4px;color:var(--text)">Import Your Data</div>
+          <div style="color:var(--text-3);font-size:12px;margin-bottom:16px">CSV is the easiest — works from Excel, Google Sheets, or any app</div>
           <div style="display:flex;flex-direction:column;gap:10px">
-            <button onclick="importCSV()" style="padding:12px 14px;border-radius:10px;background:#6366f1;border:none;color:#fff;font-size:13px;cursor:pointer;text-align:left;font-weight:600">
+            <button onclick="importCSV()" style="padding:12px 14px;border-radius:10px;background:var(--accent);border:none;color:#fff;font-size:13px;cursor:pointer;text-align:left;font-weight:600">
               📊 Import Transactions from CSV
             </button>
-            <button onclick="importData()" style="padding:12px 14px;border-radius:10px;background:#16191f;border:1px solid rgba(255,255,255,0.08);color:#c9cdd5;font-size:13px;cursor:pointer;text-align:left">
+            <button onclick="importData()" style="padding:12px 14px;border-radius:10px;background:var(--surface2);border:1px solid var(--border);color:var(--text-2);font-size:13px;cursor:pointer;text-align:left">
               🗂 Restore from JSON Backup
             </button>
           </div>
           <div id="import-status" style="margin-top:12px;font-size:13px"></div>
           <details style="margin-top:16px">
-            <summary style="color:#6b7280;font-size:12px;cursor:pointer;user-select:none">📋 CSV Format Guide</summary>
-            <div style="margin-top:10px;background:#16191f;border-radius:8px;padding:12px;font-size:11px;color:#9ca3af;font-family:monospace;overflow-x:auto;white-space:nowrap">
+            <summary style="color:var(--text-3);font-size:12px;cursor:pointer;user-select:none">📋 CSV Format Guide</summary>
+            <div style="margin-top:10px;background:var(--surface2);border-radius:8px;padding:12px;font-size:11px;color:var(--text-2);font-family:monospace;overflow-x:auto;white-space:nowrap">
               Date,Description,Type,Amount,Category,Subcategory,Account,Notes<br>
               2026-05-01,Jollibee,expense,150,Food,Fast Food,GCash,Lunch<br>
               2026-05-07,Upwork,income,50000,Freelance,Upwork,Unionbank,<br>
               2026-06-01,Rent,expense,22000,Housing,,Unionbank,June rent
             </div>
-            <div style="margin-top:10px;color:#6b7280;font-size:11px;line-height:1.7">
-              <strong style="color:#9ca3af">Required:</strong> Date (YYYY-MM-DD), Description, Type (expense/income/transfer), Amount<br>
-              <strong style="color:#9ca3af">Optional:</strong> Category, Subcategory, Account, Notes<br>
-              <strong style="color:#9ca3af">Tip:</strong> Category and Account names must match what you set up in this app
+            <div style="margin-top:10px;color:var(--text-3);font-size:11px;line-height:1.7">
+              <strong style="color:var(--text-2)">Required:</strong> Date (YYYY-MM-DD), Description, Type (expense/income/transfer), Amount<br>
+              <strong style="color:var(--text-2)">Optional:</strong> Category, Subcategory, Account, Notes<br>
+              <strong style="color:var(--text-2)">Tip:</strong> Category and Account names must match what you set up in this app
             </div>
           </details>
         </div>
@@ -443,10 +443,10 @@ function renderDashboard() {
   const lastMoExp=state.transactions.filter(t=>{const d=new Date(t.date+'T00:00:00');return t.type==='expense'&&d.getFullYear()===prevYr&&d.getMonth()===prevMo;}).reduce((s,t)=>s+t.amount,0);
   const vsLastMo = lastMoExp>0 ? (((m.expenses-lastMoExp)/lastMoExp)*100).toFixed(0) : null;
   const vsLastMoLabel = vsLastMo===null ? '—' : (vsLastMo>=0?`↑ ${vsLastMo}%`:`↓ ${Math.abs(vsLastMo)}%`);
-  const vsLastMoColor = vsLastMo===null ? 'text-gray-400' : (vsLastMo>=0 ? 'text-red-400' : 'text-emerald-400');
+  const vsLastMoColor = vsLastMo===null ? 'text-dim' : (vsLastMo>=0 ? 'text-neg' : 'text-pos');
 
   return `${renderNav()}
-    <div class="rounded-2xl p-6 mb-6" style="background:linear-gradient(135deg,#4338ca 0%,#6366f1 100%)">
+    <div class="rounded-2xl p-6 mb-6" style="background:var(--hero-gradient)">
       <div class="text-sm opacity-75 mb-1">Net worth</div>
       <div class="text-5xl font-bold tracking-tight mb-5">${fmt2(nw)}</div>
       <div class="flex gap-10">
@@ -454,83 +454,83 @@ function renderDashboard() {
         <div><div class="text-xs opacity-60 mb-0.5">Liabilities</div><div class="text-lg font-semibold">${fmt2(liab)}</div></div>
       </div>
     </div>
-    <div class="flex items-center justify-between mb-3"><div class="section-label">DEBIT ACCOUNTS</div><div class="text-xs text-emerald-400 font-medium">${fmt2(assets)}</div></div>
+    <div class="flex items-center justify-between mb-3"><div class="section-label">DEBIT ACCOUNTS</div><div class="text-xs text-pos font-medium">${fmt2(assets)}</div></div>
     <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-3">
-      ${state.accounts.map(a=>`<div class="bg-[#1c2028] rounded-xl p-4"><div class="text-xs text-gray-400 mb-2">${a.name}</div><div class="text-lg font-semibold">${editable(a.balance,`accounts.${a.id}.balance`,fmt)}</div></div>`).join('')}
+      ${state.accounts.map(a=>`<div class="bg-surface rounded-xl p-4"><div class="flex items-center gap-2 mb-2"><div style="width:24px;height:24px;border-radius:7px;overflow:hidden;flex-shrink:0;font-size:14px;display:flex;align-items:center;justify-content:center">${brandBadge(a.name, a.icon||'')}</div><div class="text-xs text-dim truncate">${a.name}</div></div><div class="text-lg font-semibold">${editable(a.balance,`accounts.${a.id}.balance`,fmt)}</div></div>`).join('')}
     </div>
-    <div class="flex items-center justify-between mb-3 mt-6"><div class="section-label">CREDIT CARDS</div><div class="text-xs text-red-400 font-medium">OWED ${fmt2(liab)}</div></div>
+    <div class="flex items-center justify-between mb-3 mt-6"><div class="section-label">CREDIT CARDS</div><div class="text-xs text-neg font-medium">OWED ${fmt2(liab)}</div></div>
     <div class="space-y-3 mb-7">
       ${state.creditCards.map(c=>{
         const avail=c.limit-c.outstanding, pct=c.limit>0?Math.min((c.outstanding/c.limit)*100,100):0;
-        return `<div class="bg-[#1c2028] rounded-xl p-4">
+        return `<div class="bg-surface rounded-xl p-4">
           <div class="flex justify-between items-start mb-3">
-            <div><div class="font-medium">${c.name}</div><div class="text-xs text-gray-500 mt-0.5">${(()=>{const dd=ccCycleDates(c.id);return dd?`Due ${fmtDateShort(dd.due)} · ${dd.daysToDue} days away`:`Due ${c.dueDay}${sfx(c.dueDay)}`})()}</div></div>
-            <div class="text-right"><div class="text-red-400 font-semibold">${fmt2(c.outstanding)}</div><div class="text-xs text-gray-500">avl. ${fmt2(avail)}</div></div>
+            <div class="flex items-center gap-3"><div style="width:32px;height:32px;border-radius:9px;overflow:hidden;flex-shrink:0;font-size:18px;display:flex;align-items:center;justify-content:center">${brandBadge(c.name, c.icon||'💳')}</div><div><div class="font-medium">${c.name}</div><div class="text-xs text-dim mt-0.5">${(()=>{const dd=ccCycleDates(c.id);return dd?`Due ${fmtDateShort(dd.due)} · ${dd.daysToDue} days away`:`Due ${c.dueDay}${sfx(c.dueDay)}`})()}</div></div></div>
+            <div class="text-right"><div class="text-neg font-semibold">${fmt2(c.outstanding)}</div><div class="text-xs text-dim">avl. ${fmt2(avail)}</div></div>
           </div>
-          <div class="bg-[#16191f] rounded-full overflow-hidden" style="height:3px"><div style="width:${pct}%;height:3px;background:#ef4444;border-radius:2px"></div></div>
+          <div class="bg-surface2 rounded-full overflow-hidden" style="height:3px"><div style="width:${pct}%;height:3px;background:var(--red-strong);border-radius:2px"></div></div>
         </div>`;}).join('')}
     </div>
-    <div class="bg-[#1c2028] rounded-2xl p-5 mb-4">
+    <div class="bg-surface rounded-2xl p-5 mb-4">
       <div class="flex items-center justify-between mb-4">
         <div class="flex items-center gap-2"><span>📊</span><span class="font-semibold">${m.label}</span></div>
-        <div class="text-xs px-2.5 py-1 rounded-full font-semibold ${net>=0?'bg-emerald-900/40 text-emerald-400':'bg-red-900/40 text-red-400'}">${net>=0?'+':''}${fmt(net)}</div>
+        <div class="text-xs px-2.5 py-1 rounded-full font-semibold ${net>=0?'pill-pos':'pill-neg'}">${net>=0?'+':''}${fmt(net)}</div>
       </div>
       <div class="space-y-3">
         <div>
-          <div class="flex justify-between text-sm mb-1.5"><span class="text-gray-400">Income</span><span class="text-emerald-400 font-medium">${fmt2(m.income)}</span></div>
-          <div class="bg-[#16191f] rounded-full overflow-hidden" style="height:6px"><div style="width:${incomeW}%;height:6px;background:linear-gradient(90deg,#10b981,#34d399);border-radius:3px"></div></div>
+          <div class="flex justify-between text-sm mb-1.5"><span class="text-dim">Income</span><span class="text-pos font-medium">${fmt2(m.income)}</span></div>
+          <div class="bg-surface2 rounded-full overflow-hidden" style="height:6px"><div style="width:${incomeW}%;height:6px;background:linear-gradient(90deg,var(--green-strong),var(--green));border-radius:3px"></div></div>
         </div>
         <div>
-          <div class="flex justify-between text-sm mb-1.5"><span class="text-gray-400">Expenses</span><span class="text-red-400 font-medium">${fmt2(m.expenses)}</span></div>
-          <div class="bg-[#16191f] rounded-full overflow-hidden" style="height:6px"><div style="width:${expW}%;height:6px;background:linear-gradient(90deg,#ef4444,#f87171);border-radius:3px"></div></div>
+          <div class="flex justify-between text-sm mb-1.5"><span class="text-dim">Expenses</span><span class="text-neg font-medium">${fmt2(m.expenses)}</span></div>
+          <div class="bg-surface2 rounded-full overflow-hidden" style="height:6px"><div style="width:${expW}%;height:6px;background:linear-gradient(90deg,var(--red-strong),var(--red));border-radius:3px"></div></div>
         </div>
       </div>
-      <div class="flex gap-4 mt-4 pt-4 border-t border-gray-800">
-        <div class="flex-1 text-center"><div class="text-xs text-gray-500 mb-0.5">Net Income</div><div class="font-bold ${net>=0?'text-emerald-400':'text-red-400'}">${fmt(net)}</div></div>
-        <div class="flex-1 text-center border-l border-gray-800"><div class="text-xs text-gray-500 mb-0.5">Savings Rate</div><div class="font-bold ${savingsRate>=20?'text-emerald-400':'text-amber-400'}">${savingsRate}%</div></div>
-        <div class="flex-1 text-center border-l border-gray-800"><div class="text-xs text-gray-500 mb-0.5">vs Last Month</div><div class="font-bold ${vsLastMoColor}">${vsLastMoLabel}</div></div>
+      <div class="flex gap-4 mt-4 pt-4 border-t border-line">
+        <div class="flex-1 text-center"><div class="text-xs text-dim mb-0.5">Net Income</div><div class="font-bold ${net>=0?'text-pos':'text-neg'}">${fmt(net)}</div></div>
+        <div class="flex-1 text-center border-l border-line"><div class="text-xs text-dim mb-0.5">Savings Rate</div><div class="font-bold ${savingsRate>=20?'text-pos':'text-accent'}">${savingsRate}%</div></div>
+        <div class="flex-1 text-center border-l border-line"><div class="text-xs text-dim mb-0.5">vs Last Month</div><div class="font-bold ${vsLastMoColor}">${vsLastMoLabel}</div></div>
       </div>
     </div>
     <div class="grid grid-cols-2 gap-3 mb-4">
-      <div class="bg-[#1c2028] rounded-2xl p-5">
-        <div class="text-xs text-gray-500 mb-1">🔥 Daily Burn Rate</div>
+      <div class="bg-surface rounded-2xl p-5">
+        <div class="text-xs text-dim mb-1">🔥 Daily Burn Rate</div>
         <div class="text-2xl font-bold">${fmt(dailyBurn)}</div>
-        <div class="text-xs text-gray-600 mt-1">per day</div>
-        <div class="mt-3 pt-3 border-t border-gray-800"><div class="text-xs text-gray-500">3-mo avg spend</div><div class="text-sm font-medium mt-0.5">${fmt(autoAvgExp)}</div></div>
+        <div class="text-xs text-dimmer mt-1">per day</div>
+        <div class="mt-3 pt-3 border-t border-line"><div class="text-xs text-dim">3-mo avg spend</div><div class="text-sm font-medium mt-0.5">${fmt(autoAvgExp)}</div></div>
       </div>
-      <div class="bg-[#1c2028] rounded-2xl p-5">
-        <div class="text-xs text-gray-500 mb-1">⏱️ Cash Runway</div>
-        <div class="text-2xl font-bold ${runway<14?'text-red-400':runway<30?'text-amber-400':'text-emerald-400'}">${runway}</div>
-        <div class="text-xs text-gray-600 mt-1">days remaining</div>
-        <div class="mt-3 pt-3 border-t border-gray-800"><div class="text-xs ${runway<14?'text-red-400':runway<30?'text-amber-400':'text-gray-500'}">${runway<14?'⚠️ Income needed soon':runway<30?'Moderate cushion':'Good buffer'}</div></div>
+      <div class="bg-surface rounded-2xl p-5">
+        <div class="text-xs text-dim mb-1">⏱️ Cash Runway</div>
+        <div class="text-2xl font-bold ${runway<14?'text-neg':runway<30?'text-accent':'text-pos'}">${runway}</div>
+        <div class="text-xs text-dimmer mt-1">days remaining</div>
+        <div class="mt-3 pt-3 border-t border-line"><div class="text-xs ${runway<14?'text-neg':runway<30?'text-accent':'text-dim'}">${runway<14?'⚠️ Income needed soon':runway<30?'Moderate cushion':'Good buffer'}</div></div>
       </div>
     </div>
-    <div class="bg-[#1c2028] rounded-2xl p-5 mb-4">
+    <div class="bg-surface rounded-2xl p-5 mb-4">
       <div class="flex items-center gap-2 mb-4"><span>🏆</span><span class="font-semibold">Top Spending — ${m.label}</span></div>
       <div class="space-y-3">
         ${m.categories.map((c,i)=>{
           const pct=(c.amount/maxCat)*100;
           return `<div>
             <div class="flex justify-between items-center mb-1.5">
-              <div class="flex items-center gap-2 text-sm"><span class="text-base">${c.icon}</span><span>${c.name}</span><span class="text-xs text-gray-600">#${i+1}</span></div>
+              <div class="flex items-center gap-2 text-sm"><span class="text-base">${c.icon}</span><span>${c.name}</span><span class="text-xs text-dimmer">#${i+1}</span></div>
               <span class="text-sm font-medium">${fmt(c.amount)}</span>
             </div>
-            <div class="bg-[#16191f] rounded-full overflow-hidden" style="height:5px"><div style="width:${pct}%;height:5px;background:${c.color};border-radius:3px;opacity:0.85"></div></div>
+            <div class="bg-surface2 rounded-full overflow-hidden" style="height:5px"><div style="width:${pct}%;height:5px;background:${c.color};border-radius:3px;opacity:0.85"></div></div>
           </div>`;}).join('')}
       </div>
     </div>
-    <div class="bg-[#1c2028] rounded-2xl p-5 mb-4">
+    <div class="bg-surface rounded-2xl p-5 mb-4">
       <div class="flex items-center gap-2 mb-4"><span>🪙</span><span class="font-semibold">Spending Forecast</span></div>
       <div class="flex gap-2 mb-5 flex-wrap">
-        ${[7,14,21,30].map(d=>`<button class="tab-btn text-xs px-3 py-1.5 rounded-full ${state.forecastDays===d?'active':'bg-[#2a2d35] text-gray-300'}" onclick="setForecast(${d})">${d} days</button>`).join('')}
+        ${[7,14,21,30].map(d=>`<button class="tab-btn text-xs px-3 py-1.5 rounded-full ${state.forecastDays===d?'active':'bg-surface2 text-dim'}" onclick="setForecast(${d})">${d} days</button>`).join('')}
       </div>
-      <div class="flex justify-between py-2.5 border-b border-gray-800"><span class="text-sm">Spendable funds${spendable!==assets?' <span class="text-xs text-gray-600">(excl. maintaining bal.)</span>':''}</span><span class="font-semibold">${fmt2(spendable)}</span></div>
-      <div class="text-xs text-gray-600 font-semibold tracking-wider mt-4 mb-2">SCHEDULED INCOME</div>
-      ${forecastItems.income.length===0?`<div class="text-xs text-gray-700 py-1.5">None in this window</div>`:forecastItems.income.map(r=>`<div class="flex justify-between items-center py-1.5"><div class="text-sm flex items-center gap-2"><span>${r.icon}</span>${r.name}</div><div class="text-sm ${r.amount===0?'text-gray-700':'text-emerald-400'}">${r.amount===0?'—':'+ '+fmt(r.amount)}</div></div>`).join('')}
-      <div class="text-xs text-gray-600 font-semibold tracking-wider mt-4 mb-2">SCHEDULED EXPENSES</div>
-      ${forecastItems.expense.length===0&&ccForecastExp===0?`<div class="text-xs text-gray-700 py-1.5">None in this window</div>`:forecastItems.expense.map(r=>`<div class="flex justify-between items-center py-1.5"><div class="text-sm flex items-center gap-2"><span>${r.icon}</span>${r.name}</div><div class="text-sm text-red-400">− ${fmt(r.amount)}</div></div>`).join('')}
-      ${ccDueForecast.map(c=>{ const dates=ccCycleDates(c.id); const inWindow=dates&&dates.due<=forecastEnd; return `<div class="flex justify-between items-center py-1.5"><div class="text-sm flex items-center gap-2"><span>💳</span>${c.name}<span class="text-xs ml-1" style="color:${inWindow?'#f59e0b':'#6b7280'}">due ${dates?fmtDateShort(dates.due):'—'}${inWindow?'':' · outside window'}</span></div><div class="text-sm" style="color:${inWindow?'#f87171':'#6b7280'}">− ${fmt(ccDueAmount(c))}</div></div>`; }).join('')}
-      <div class="flex justify-between items-center pt-4 mt-3 border-t border-gray-800"><span class="font-semibold">Available to spend</span><span class="text-lg font-bold ${available>=0?'text-emerald-400':'text-red-400'}">${fmt2(available)}</span></div>
+      <div class="flex justify-between py-2.5 border-b border-line"><span class="text-sm">Spendable funds${spendable!==assets?' <span class="text-xs text-dimmer">(excl. maintaining bal.)</span>':''}</span><span class="font-semibold">${fmt2(spendable)}</span></div>
+      <div class="text-xs text-dimmer font-semibold tracking-wider mt-4 mb-2">SCHEDULED INCOME</div>
+      ${forecastItems.income.length===0?`<div class="text-xs text-dimmer py-1.5">None in this window</div>`:forecastItems.income.map(r=>`<div class="flex justify-between items-center py-1.5"><div class="text-sm flex items-center gap-2"><span>${r.icon}</span>${r.name}</div><div class="text-sm ${r.amount===0?'text-dimmer':'text-pos'}">${r.amount===0?'—':'+ '+fmt(r.amount)}</div></div>`).join('')}
+      <div class="text-xs text-dimmer font-semibold tracking-wider mt-4 mb-2">SCHEDULED EXPENSES</div>
+      ${forecastItems.expense.length===0&&ccForecastExp===0?`<div class="text-xs text-dimmer py-1.5">None in this window</div>`:forecastItems.expense.map(r=>`<div class="flex justify-between items-center py-1.5"><div class="text-sm flex items-center gap-2"><span>${r.icon}</span>${r.name}</div><div class="text-sm text-neg">− ${fmt(r.amount)}</div></div>`).join('')}
+      ${ccDueForecast.map(c=>{ const dates=ccCycleDates(c.id); const inWindow=dates&&dates.due<=forecastEnd; return `<div class="flex justify-between items-center py-1.5"><div class="text-sm flex items-center gap-2"><span>💳</span>${c.name}<span class="text-xs ml-1" style="color:${inWindow?'var(--amber)':'var(--text-3)'}">due ${dates?fmtDateShort(dates.due):'—'}${inWindow?'':' · outside window'}</span></div><div class="text-sm" style="color:${inWindow?'var(--red)':'var(--text-3)'}">− ${fmt(ccDueAmount(c))}</div></div>`; }).join('')}
+      <div class="flex justify-between items-center pt-4 mt-3 border-t border-line"><span class="font-semibold">Available to spend</span><span class="text-lg font-bold ${available>=0?'text-pos':'text-neg'}">${fmt2(available)}</span></div>
     </div>
       <div class="flex items-center gap-2 mb-4"><span>🎯</span><span class="font-semibold">Financial Goals</span></div>
       ${state.goals.map(g=>{
@@ -538,22 +538,22 @@ function renderDashboard() {
         const remaining=Math.max(g.target-gs.total,0), months=monthsBetween(g.targetDate), monthly=months>0?remaining/months:remaining, daily=monthly/30;
         const pct=g.target>0?Math.min((gs.total/g.target)*100,100):0;
         const dateLabel=new Date(g.targetDate).toLocaleDateString('en-US',{month:'short',year:'numeric'});
-        return `<div class="rounded-xl p-4" style="background:#0e1014">
+        return `<div class="rounded-xl p-4" style="background:var(--bg)">
           <div class="flex justify-between items-start mb-3">
-            <div><div class="font-semibold">${g.icon} ${g.name}</div><div class="text-xs text-gray-500 mt-0.5">Target: ${dateLabel} · ${months} months away</div></div>
-            <div class="text-xs px-2 py-1 rounded-full" style="background:rgba(99,102,241,0.15);color:#a5b4fc">${pct.toFixed(1)}%</div>
+            <div><div class="font-semibold">${g.icon} ${g.name}</div><div class="text-xs text-dim mt-0.5">Target: ${dateLabel} · ${months} months away</div></div>
+            <div class="text-xs px-2 py-1 rounded-full" style="background:var(--accent-dim);color:var(--accent-text)">${pct.toFixed(1)}%</div>
           </div>
-          <div class="flex justify-between text-sm mb-1.5"><span class="text-gray-500">Saved so far</span><span class="font-semibold text-emerald-400">${fmt(gs.total)} <span class="text-gray-500">of ${fmt(g.target)}</span></span></div>
-          <div class="bg-[#16191f] rounded-full overflow-hidden mb-4" style="height:6px"><div style="width:${pct.toFixed(1)}%;height:6px;background:linear-gradient(90deg,#f59e0b,#fbbf24);border-radius:3px"></div></div>
+          <div class="flex justify-between text-sm mb-1.5"><span class="text-dim">Saved so far</span><span class="font-semibold text-pos">${fmt(gs.total)} <span class="text-dim">of ${fmt(g.target)}</span></span></div>
+          <div class="bg-surface2 rounded-full overflow-hidden mb-4" style="height:6px"><div style="width:${pct.toFixed(1)}%;height:6px;background:linear-gradient(90deg,var(--amber),var(--amber-2));border-radius:3px"></div></div>
           <div class="grid grid-cols-3 gap-2">
-            <div class="bg-[#1c2028] rounded-lg p-3"><div class="text-xs text-gray-500">Remaining</div><div class="font-semibold mt-0.5 text-sm">${fmt(remaining)}</div></div>
-            <div class="bg-[#1c2028] rounded-lg p-3"><div class="text-xs text-gray-500">Monthly needed</div><div class="font-semibold mt-0.5 text-sm">${fmt(monthly)}</div></div>
-            <div class="bg-[#1c2028] rounded-lg p-3"><div class="text-xs text-gray-500">Daily needed</div><div class="font-semibold mt-0.5 text-sm">${fmt(daily)}</div></div>
+            <div class="bg-surface rounded-lg p-3"><div class="text-xs text-dim">Remaining</div><div class="font-semibold mt-0.5 text-sm">${fmt(remaining)}</div></div>
+            <div class="bg-surface rounded-lg p-3"><div class="text-xs text-dim">Monthly needed</div><div class="font-semibold mt-0.5 text-sm">${fmt(monthly)}</div></div>
+            <div class="bg-surface rounded-lg p-3"><div class="text-xs text-dim">Daily needed</div><div class="font-semibold mt-0.5 text-sm">${fmt(daily)}</div></div>
           </div>
         </div>`;}).join('')}
-      <button class="w-full text-sm text-gray-600 mt-3 py-3 px-4 border border-dashed border-gray-800 rounded-xl hover:border-gray-600 hover:text-gray-400 transition-colors">+ Add another goal</button>
+      <button class="w-full text-sm text-dimmer mt-3 py-3 px-4 border border-dashed border-line rounded-xl hover:border-gray-600 hover:text-dim transition-colors">+ Add another goal</button>
     </div>
-    <div class="text-center text-xs text-gray-700 mt-8 pb-4">Click any number to edit · Changes saved automatically · <span class="cursor-pointer hover:text-indigo-400" onclick="setView('transactions')">View all transactions →</span></div>`;
+    <div class="text-center text-xs text-dimmer mt-8 pb-4">Click any number to edit · Changes saved automatically · <span class="cursor-pointer hover:text-accent" onclick="setView('transactions')">View all transactions →</span></div>`;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -583,14 +583,14 @@ function renderRecurring() {
     const subs=selCat?(cats.find(c=>c.id===selCat)?.subs||[]).filter(s=>s.active):[];
     return `
       <div class="fixed inset-0 flex items-end sm:items-center justify-center" style="z-index:200;background:rgba(0,0,0,0.8)" onclick="${onClose}">
-        <div class="w-full sm:w-96 rounded-t-3xl sm:rounded-2xl p-6" style="background:#1c2028;border:1px solid rgba(255,255,255,0.08);max-height:92vh;overflow-y:auto" onclick="event.stopPropagation()">
+        <div class="w-full sm:w-96 rounded-t-3xl sm:rounded-2xl p-6" style="background:var(--surface);border:1px solid var(--border);max-height:92vh;overflow-y:auto" onclick="event.stopPropagation()">
           <div class="flex items-center justify-between mb-5">
             <div class="text-lg font-bold">${title}</div>
-            <button onclick="${onClose}" style="background:none;border:none;color:#6b7280;cursor:pointer;font-size:22px;line-height:1">×</button>
+            <button onclick="${onClose}" style="background:none;border:none;color:var(--text-3);cursor:pointer;font-size:22px;line-height:1">×</button>
           </div>
           <div class="grid gap-3 mb-3" style="grid-template-columns:56px 1fr">
             <div><div class="field-label">ICON</div><input type="hidden" id="${pfx}rec-icon" value="${r?r.icon||'🔁':'🔁'}">
-              <button type="button" onclick="iconPickerOpen('${pfx}rec-icon','rec')" id="${pfx}rec-icon-btn" onmouseover="this.style.borderColor='#6366f1'" onmouseout="this.style.borderColor='rgba(255,255,255,0.08)'" style="width:100%;height:44px;background:#16191f;border:1px solid rgba(255,255,255,0.08);border-radius:10px;font-size:24px;cursor:pointer;line-height:1;transition:border-color 0.15s">${r?r.icon||'🔁':'🔁'}</button></div>
+              <button type="button" onclick="iconPickerOpen('${pfx}rec-icon','rec')" id="${pfx}rec-icon-btn" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'" style="width:100%;height:44px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;font-size:24px;cursor:pointer;line-height:1;transition:border-color 0.15s">${r?r.icon||'🔁':'🔁'}</button></div>
             <div><div class="field-label">NAME *</div><input id="${pfx}rec-name" type="text" ${r?`value="${r.name}"`:'placeholder="e.g. Rent"'} class="field-input"></div>
           </div>
           <div class="grid grid-cols-2 gap-3 mb-3">
@@ -631,10 +631,10 @@ function renderRecurring() {
               ${state.creditCards.length?`<optgroup label="── Credit Cards ──">${state.creditCards.map(c=>`<option value="${c.id}" ${r?.accountId===c.id?'selected':''}>${c.icon||'💳'} ${c.name} (CC)</option>`).join('')}</optgroup>`:''}
             </select>
           </div>
-          ${errId?`<div id="${errId}" class="text-red-400 text-xs mb-3"></div>`:''}
+          ${errId?`<div id="${errId}" class="text-neg text-xs mb-3"></div>`:''}
           <div class="flex gap-3">
-            <button onclick="${onSave}" class="flex-1 rounded-xl py-3 font-semibold text-white text-sm" style="background:#6366f1;border:none;cursor:pointer">${isEdit?'Save Changes':'Add Recurring'}</button>
-            <button onclick="${onClose}" class="flex-1 rounded-xl py-3 text-sm" style="background:#16191f;border:1px solid rgba(255,255,255,0.08);color:#9ca3af;cursor:pointer">Cancel</button>
+            <button onclick="${onSave}" class="flex-1 rounded-xl py-3 font-semibold text-white text-sm" style="background:var(--accent);border:none;cursor:pointer">${isEdit?'Save Changes':'Add Recurring'}</button>
+            <button onclick="${onClose}" class="flex-1 rounded-xl py-3 text-sm" style="background:var(--surface2);border:1px solid var(--border);color:var(--text-2);cursor:pointer">Cancel</button>
           </div>
         </div>
       </div>`;
@@ -645,46 +645,46 @@ function renderRecurring() {
     const sub=cat&&r.subcategoryId?cat.subs.find(s=>s.id===r.subcategoryId):null;
     const acct=r.accountId?findAccount(r.accountId):null;
     const isOverdue=r.nextDue<todayISO, isDueToday=r.nextDue===todayISO;
-    const typeColor=r.type==='income'?'#34d399':'#f87171';
-    const typeBg=r.type==='income'?'rgba(52,211,153,0.12)':'rgba(248,113,113,0.12)';
+    const typeColor=r.type==='income'?'var(--green)':'var(--red)';
+    const typeBg=r.type==='income'?'var(--green-dim)':'var(--red-dim)';
 
     if (recUI.deleteRecId===r.id) return `
-      <div class="rounded-2xl p-4 mb-3" style="background:#1c2028;border:1px solid #7f1d1d">
-        <div class="text-sm mb-3" style="color:#fca5a5">Delete <strong>${r.icon} ${r.name}</strong>? Cannot be undone.</div>
+      <div class="rounded-2xl p-4 mb-3" style="background:var(--surface);border:1px solid var(--danger-border)">
+        <div class="text-sm mb-3" style="color:var(--danger-text)">Delete <strong>${r.icon} ${r.name}</strong>? Cannot be undone.</div>
         <div class="flex gap-2">
-          <button onclick="recConfirmDelete()" class="rounded-lg px-5 py-2 text-sm font-semibold" style="background:#ef4444;border:none;color:#fff;cursor:pointer">Delete</button>
-          <button onclick="recCancelDelete()" class="rounded-lg px-5 py-2 text-sm" style="background:rgba(255,255,255,0.08);border:none;color:#9ca3af;cursor:pointer">Cancel</button>
+          <button onclick="recConfirmDelete()" class="rounded-lg px-5 py-2 text-sm font-semibold" style="background:var(--red-strong);border:none;color:#fff;cursor:pointer">Delete</button>
+          <button onclick="recCancelDelete()" class="rounded-lg px-5 py-2 text-sm" style="background:var(--btn-ghost);border:none;color:var(--text-2);cursor:pointer">Cancel</button>
         </div>
       </div>`;
 
     return `
-      <div class="rounded-2xl p-4 mb-3" style="background:#1c2028;${!r.active?'opacity:0.6':''}">
+      <div class="rounded-2xl p-4 mb-3" style="background:var(--surface);${!r.active?'opacity:0.6':''}">
         <div class="flex items-start justify-between mb-3">
           <div class="flex items-center gap-3">
             <div class="flex-shrink-0 flex items-center justify-center rounded-xl text-xl" style="width:42px;height:42px;background:${typeBg}">${r.icon||'🔁'}</div>
             <div>
-              <div class="font-semibold text-sm" style="color:#f1f1f3">${r.name}</div>
+              <div class="font-semibold text-sm" style="color:var(--text)">${r.name}</div>
               <div class="flex items-center gap-2 mt-1 flex-wrap">
                 <span class="text-xs px-2 py-0.5 rounded-full font-medium" style="background:${typeBg};color:${typeColor}">${r.type==='income'?'💰 Income':'💸 Expense'}</span>
-                <span class="text-xs px-2 py-0.5 rounded-full" style="background:#16191f;color:#9ca3af">${FREQ[r.frequency]||r.frequency}</span>
-                ${!r.active?`<span class="text-xs px-2 py-0.5 rounded-full" style="background:rgba(255,255,255,0.08);color:#9ca3af">⏸ Paused</span>`:''}
-                ${isOverdue&&r.active?`<span class="text-xs px-2 py-0.5 rounded-full font-semibold" style="background:rgba(248,113,113,0.15);color:#f87171">⚠️ Overdue</span>`:''}
-                ${isDueToday?`<span class="text-xs px-2 py-0.5 rounded-full font-semibold" style="background:rgba(251,191,36,0.15);color:#fbbf24">⚡ Due today</span>`:''}
+                <span class="text-xs px-2 py-0.5 rounded-full" style="background:var(--surface2);color:var(--text-2)">${FREQ[r.frequency]||r.frequency}</span>
+                ${!r.active?`<span class="text-xs px-2 py-0.5 rounded-full" style="background:var(--btn-ghost);color:var(--text-2)">⏸ Paused</span>`:''}
+                ${isOverdue&&r.active?`<span class="text-xs px-2 py-0.5 rounded-full font-semibold" style="background:var(--red-dim);color:var(--red)">⚠️ Overdue</span>`:''}
+                ${isDueToday?`<span class="text-xs px-2 py-0.5 rounded-full font-semibold" style="background:var(--amber-dim);color:var(--amber-2)">⚡ Due today</span>`:''}
               </div>
             </div>
           </div>
           <div class="text-right flex-shrink-0 ml-2">
             <div class="font-bold text-sm" style="color:${typeColor}">${r.type==='income'?'+':'-'}${fmt2(r.amount)}</div>
             <div class="flex gap-1 mt-1 justify-end">
-              <button onclick="recToggleActive('${r.id}')" title="${r.active?'Pause':'Resume'}" style="background:#16191f;border:none;color:#9ca3af;cursor:pointer;border-radius:8px;padding:5px 7px;font-size:13px">${r.active?'⏸':'▶'}</button>
-              <button onclick="recDuplicate('${r.id}')" title="Duplicate" style="background:#16191f;border:none;color:#9ca3af;cursor:pointer;border-radius:8px;padding:5px 7px;font-size:13px">⧉</button>
-              <button onclick="recOpenEdit('${r.id}')" style="background:#16191f;border:none;color:#9ca3af;cursor:pointer;border-radius:8px;padding:5px 7px;font-size:13px">✏️</button>
-              <button onclick="recAskDelete('${r.id}')" style="background:#16191f;border:none;color:#9ca3af;cursor:pointer;border-radius:8px;padding:5px 7px;font-size:13px">🗑️</button>
+              <button onclick="recToggleActive('${r.id}')" title="${r.active?'Pause':'Resume'}" style="background:var(--surface2);border:none;color:var(--text-2);cursor:pointer;border-radius:8px;padding:5px 7px;font-size:13px">${r.active?'⏸':'▶'}</button>
+              <button onclick="recDuplicate('${r.id}')" title="Duplicate" style="background:var(--surface2);border:none;color:var(--text-2);cursor:pointer;border-radius:8px;padding:5px 7px;font-size:13px">⧉</button>
+              <button onclick="recOpenEdit('${r.id}')" style="background:var(--surface2);border:none;color:var(--text-2);cursor:pointer;border-radius:8px;padding:5px 7px;font-size:13px">✏️</button>
+              <button onclick="recAskDelete('${r.id}')" style="background:var(--surface2);border:none;color:var(--text-2);cursor:pointer;border-radius:8px;padding:5px 7px;font-size:13px">🗑️</button>
             </div>
           </div>
         </div>
-        <div class="flex items-center gap-4 text-xs flex-wrap" style="color:#6b7280">
-          <span style="color:${isOverdue?'#f87171':isDueToday?'#fbbf24':'#6b7280'}">📅 ${isOverdue?'Overdue · ':isDueToday?'Today · ':'Next: '}${fmtDate(r.nextDue)}</span>
+        <div class="flex items-center gap-4 text-xs flex-wrap" style="color:var(--text-3)">
+          <span style="color:${isOverdue?'var(--red)':isDueToday?'var(--amber-2)':'var(--text-3)'}">📅 ${isOverdue?'Overdue · ':isDueToday?'Today · ':'Next: '}${fmtDate(r.nextDue)}</span>
           ${cat?`<span>${cat.icon} ${cat.name}${sub?' › '+sub.name:''}</span>`:''}
           ${acct?`<span>${acct.icon||'💳'} ${acct.name}</span>`:''}
         </div>
@@ -696,26 +696,26 @@ function renderRecurring() {
   return `${renderNav()}
     <div class="flex items-center justify-between mb-1">
       <div class="text-2xl font-bold">Recurring</div>
-      <button onclick="recOpenAdd()" class="rounded-xl px-4 py-2.5 text-sm font-semibold text-white flex-shrink-0" style="background:#6366f1;border:none;cursor:pointer">+ Add</button>
+      <button onclick="recOpenAdd()" class="rounded-xl px-4 py-2.5 text-sm font-semibold text-white flex-shrink-0" style="background:var(--accent);border:none;cursor:pointer">+ Add</button>
     </div>
     <div class="section-label mb-4">${recs.length} item${recs.length!==1?'s':''} · ${active.length} active</div>
 
     ${recAutoPostedCount>0?`
-    <div class="flex items-center gap-3 rounded-xl p-3 mb-4 text-sm" style="background:rgba(52,211,153,0.1);border:1px solid rgba(52,211,153,0.2)">
+    <div class="flex items-center gap-3 rounded-xl p-3 mb-4 text-sm" style="background:var(--green-dim);border:1px solid var(--green-dim)">
       <span>⚡</span>
-      <span style="color:#6ee7b7"><strong>${recAutoPostedCount} transaction${recAutoPostedCount>1?'s':''}</strong> were auto-posted since your last visit</span>
+      <span style="color:var(--green)"><strong>${recAutoPostedCount} transaction${recAutoPostedCount>1?'s':''}</strong> were auto-posted since your last visit</span>
     </div>`:''}
 
     <div class="grid grid-cols-2 gap-3 mb-5">
-      <div class="rounded-2xl p-4" style="background:#1c2028">
-        <div class="text-xs mb-1" style="color:#6b7280">Monthly Expenses</div>
-        <div class="text-xl font-bold text-red-400">-${fmt2(monthlyExp)}</div>
-        <div class="text-xs mt-0.5" style="color:#6b7280">${active.filter(r=>r.type==='expense').length} items</div>
+      <div class="rounded-2xl p-4" style="background:var(--surface)">
+        <div class="text-xs mb-1" style="color:var(--text-3)">Monthly Expenses</div>
+        <div class="text-xl font-bold text-neg">-${fmt2(monthlyExp)}</div>
+        <div class="text-xs mt-0.5" style="color:var(--text-3)">${active.filter(r=>r.type==='expense').length} items</div>
       </div>
-      <div class="rounded-2xl p-4" style="background:#1c2028">
-        <div class="text-xs mb-1" style="color:#6b7280">Monthly Income</div>
-        <div class="text-xl font-bold text-emerald-400">+${fmt2(monthlyInc)}</div>
-        <div class="text-xs mt-0.5" style="color:#6b7280">${active.filter(r=>r.type==='income').length} items</div>
+      <div class="rounded-2xl p-4" style="background:var(--surface)">
+        <div class="text-xs mb-1" style="color:var(--text-3)">Monthly Income</div>
+        <div class="text-xl font-bold text-pos">+${fmt2(monthlyInc)}</div>
+        <div class="text-xs mt-0.5" style="color:var(--text-3)">${active.filter(r=>r.type==='income').length} items</div>
       </div>
     </div>
 
@@ -723,8 +723,8 @@ function renderRecurring() {
       <div class="flex flex-col items-center justify-center py-20 text-center">
         <div class="text-5xl mb-4">🔁</div>
         <div class="text-xl font-bold mb-2">No recurring items</div>
-        <div class="text-sm max-w-xs mb-5" style="color:#6b7280">Add your regular bills, salaries, and income so they post automatically.</div>
-        <button onclick="recOpenAdd()" class="rounded-xl px-6 py-3 text-sm font-semibold text-white" style="background:#6366f1;border:none;cursor:pointer">+ Add your first item</button>
+        <div class="text-sm max-w-xs mb-5" style="color:var(--text-3)">Add your regular bills, salaries, and income so they post automatically.</div>
+        <button onclick="recOpenAdd()" class="rounded-xl px-6 py-3 text-sm font-semibold text-white" style="background:var(--accent);border:none;cursor:pointer">+ Add your first item</button>
       </div>`:sorted.map(r=>recCard(r)).join('')}
 
     ${recUI.showAddRec ? recModal(null) : ''}
@@ -739,8 +739,8 @@ function renderGoals() {
     const months=monthsBetween(g.targetDate);
     const monthly=months>0?remaining/months:remaining, daily=monthly/30;
     const pct=g.target>0?Math.min((gs.total/g.target)*100,100):0;
-    const barColor=pct>=66?'linear-gradient(90deg,#10b981,#34d399)':pct>=33?'linear-gradient(90deg,#f59e0b,#fbbf24)':'linear-gradient(90deg,#6366f1,#a5b4fc)';
-    const pctColor=pct>=66?'#34d399':pct>=33?'#fbbf24':'#a5b4fc';
+    const barColor=pct>=66?'linear-gradient(90deg,var(--green-strong),var(--green))':pct>=33?'linear-gradient(90deg,var(--amber),var(--amber-2))':'linear-gradient(90deg,var(--accent),var(--accent-text))';
+    const pctColor=pct>=66?'var(--green)':pct>=33?'var(--amber-2)':'var(--accent-text)';
     const dateLabel=new Date(g.targetDate).toLocaleDateString('en-US',{month:'short',year:'numeric'});
     const deposits=g.deposits||[];
     const isDepositOpen=goalUI.depositGoalId===g.id;
@@ -749,16 +749,16 @@ function renderGoals() {
     const linkedSub=g.linkedSubcategoryId&&linkedCat?linkedCat.subs.find(s=>s.id===g.linkedSubcategoryId):null;
 
     if (goalUI.deleteGoalId===g.id) return `
-      <div class="rounded-2xl p-5 mb-4" style="background:#1c2028;border:1px solid #7f1d1d">
-        <div class="text-sm mb-3" style="color:#fca5a5">Delete <strong>${g.icon} ${g.name}</strong>? All deposit history will be lost. Cannot be undone.</div>
+      <div class="rounded-2xl p-5 mb-4" style="background:var(--surface);border:1px solid var(--danger-border)">
+        <div class="text-sm mb-3" style="color:var(--danger-text)">Delete <strong>${g.icon} ${g.name}</strong>? All deposit history will be lost. Cannot be undone.</div>
         <div class="flex gap-2">
-          <button onclick="goalConfirmDelete()" class="rounded-lg px-5 py-2 text-sm font-semibold" style="background:#ef4444;border:none;color:#fff;cursor:pointer">Delete Goal</button>
-          <button onclick="goalCancelDelete()" class="rounded-lg px-5 py-2 text-sm" style="background:rgba(255,255,255,0.08);border:none;color:#9ca3af;cursor:pointer">Cancel</button>
+          <button onclick="goalConfirmDelete()" class="rounded-lg px-5 py-2 text-sm font-semibold" style="background:var(--red-strong);border:none;color:#fff;cursor:pointer">Delete Goal</button>
+          <button onclick="goalCancelDelete()" class="rounded-lg px-5 py-2 text-sm" style="background:var(--btn-ghost);border:none;color:var(--text-2);cursor:pointer">Cancel</button>
         </div>
       </div>`;
 
     const depositForm=isDepositOpen?`
-      <div class="mt-4 pt-4" style="border-top:1px solid rgba(255,255,255,0.08)">
+      <div class="mt-4 pt-4" style="border-top:1px solid var(--border)">
         <div class="section-label mb-3">ADD DEPOSIT</div>
         <div class="grid grid-cols-2 gap-2 mb-2">
           <div><div class="field-label">AMOUNT (₱) *</div><input id="dep-amt-${g.id}" type="number" step="0.01" min="0" placeholder="0.00" class="field-input"></div>
@@ -766,91 +766,91 @@ function renderGoals() {
         </div>
         <div class="mb-3"><div class="field-label">NOTE (optional)</div><input id="dep-note-${g.id}" type="text" placeholder="e.g. Monthly savings" class="field-input"></div>
         <div class="flex gap-2">
-          <button onclick="goalAddDeposit('${g.id}')" class="flex-1 rounded-xl py-2.5 text-sm font-semibold text-white" style="background:#6366f1;border:none;cursor:pointer">Save Deposit</button>
-          <button onclick="goalCloseDeposit()" class="flex-1 rounded-xl py-2.5 text-sm" style="background:rgba(255,255,255,0.08);border:none;color:#9ca3af;cursor:pointer">Cancel</button>
+          <button onclick="goalAddDeposit('${g.id}')" class="flex-1 rounded-xl py-2.5 text-sm font-semibold text-white" style="background:var(--accent);border:none;cursor:pointer">Save Deposit</button>
+          <button onclick="goalCloseDeposit()" class="flex-1 rounded-xl py-2.5 text-sm" style="background:var(--btn-ghost);border:none;color:var(--text-2);cursor:pointer">Cancel</button>
         </div>
       </div>`:'';
 
     const historyRows=deposits.slice().reverse().map(d=>{
       const isDel=goalUI.deleteDepositKey&&goalUI.deleteDepositKey.goalId===g.id&&goalUI.deleteDepositKey.depositId===d.id;
       if(isDel) return `
-        <div class="flex items-center gap-3 py-2" style="border-bottom:1px solid rgba(255,255,255,0.05)">
-          <div class="flex-1 text-xs" style="color:#fca5a5">Remove ${fmt(d.amount)} deposit?</div>
-          <button onclick="goalConfirmDeleteDeposit()" class="text-xs px-3 py-1 rounded-lg" style="background:#ef4444;border:none;color:#fff;cursor:pointer">Remove</button>
-          <button onclick="goalCancelDeleteDeposit()" class="text-xs px-3 py-1 rounded-lg" style="background:rgba(255,255,255,0.08);border:none;color:#9ca3af;cursor:pointer">Keep</button>
+        <div class="flex items-center gap-3 py-2" style="border-bottom:1px solid var(--border2)">
+          <div class="flex-1 text-xs" style="color:var(--danger-text)">Remove ${fmt(d.amount)} deposit?</div>
+          <button onclick="goalConfirmDeleteDeposit()" class="text-xs px-3 py-1 rounded-lg" style="background:var(--red-strong);border:none;color:#fff;cursor:pointer">Remove</button>
+          <button onclick="goalCancelDeleteDeposit()" class="text-xs px-3 py-1 rounded-lg" style="background:var(--btn-ghost);border:none;color:var(--text-2);cursor:pointer">Keep</button>
         </div>`;
       return `
-        <div class="flex items-center gap-3 py-2" style="border-bottom:1px solid rgba(255,255,255,0.05)">
+        <div class="flex items-center gap-3 py-2" style="border-bottom:1px solid var(--border2)">
           <div class="flex-1 min-w-0">
-            <div class="text-sm font-semibold text-emerald-400">+${fmt(d.amount)}</div>
-            <div class="text-xs truncate" style="color:#6b7280">${fmtDate(d.date)}${d.note?' · '+d.note:''}</div>
+            <div class="text-sm font-semibold text-pos">+${fmt(d.amount)}</div>
+            <div class="text-xs truncate" style="color:var(--text-3)">${fmtDate(d.date)}${d.note?' · '+d.note:''}</div>
           </div>
-          <button onclick="goalAskDeleteDeposit('${g.id}','${d.id}')" style="background:none;border:none;color:#6b7280;cursor:pointer;font-size:18px;padding:0 4px;line-height:1;flex-shrink:0">×</button>
+          <button onclick="goalAskDeleteDeposit('${g.id}','${d.id}')" style="background:none;border:none;color:var(--text-3);cursor:pointer;font-size:18px;padding:0 4px;line-height:1;flex-shrink:0">×</button>
         </div>`;
     }).join('');
 
     const historySection=isHistoryOpen?`
-      <div class="mt-4 pt-4" style="border-top:1px solid rgba(255,255,255,0.08)">
+      <div class="mt-4 pt-4" style="border-top:1px solid var(--border)">
         <div class="section-label mb-2">DEPOSIT HISTORY</div>
         ${deposits.length===0
-          ?`<div class="text-sm text-center py-3" style="color:#6b7280">No manual deposits yet.</div>`
+          ?`<div class="text-sm text-center py-3" style="color:var(--text-3)">No manual deposits yet.</div>`
           :historyRows}
       </div>`:'';
 
     return `
-      <div class="rounded-2xl p-5 mb-4" style="background:#1c2028">
+      <div class="rounded-2xl p-5 mb-4" style="background:var(--surface)">
         <div class="flex items-start justify-between mb-4">
           <div>
             <div class="flex items-center gap-2 text-lg font-bold">${g.icon} ${g.name}</div>
-            <div class="text-xs mt-0.5" style="color:#6b7280">Target ${dateLabel} · ${months} month${months!==1?'s':''} away</div>
+            <div class="text-xs mt-0.5" style="color:var(--text-3)">Target ${dateLabel} · ${months} month${months!==1?'s':''} away</div>
           </div>
           <div class="flex gap-1 flex-shrink-0">
-            <button onclick="goalOpenEdit('${g.id}')" style="background:#16191f;border:none;color:#9ca3af;cursor:pointer;border-radius:8px;padding:6px 8px;font-size:13px">✏️</button>
-            <button onclick="goalAskDelete('${g.id}')" style="background:#16191f;border:none;color:#9ca3af;cursor:pointer;border-radius:8px;padding:6px 8px;font-size:13px">🗑️</button>
+            <button onclick="goalOpenEdit('${g.id}')" style="background:var(--surface2);border:none;color:var(--text-2);cursor:pointer;border-radius:8px;padding:6px 8px;font-size:13px">✏️</button>
+            <button onclick="goalAskDelete('${g.id}')" style="background:var(--surface2);border:none;color:var(--text-2);cursor:pointer;border-radius:8px;padding:6px 8px;font-size:13px">🗑️</button>
           </div>
         </div>
 
         <div class="flex items-center gap-3 mb-4">
-          <div class="flex-1 rounded-full overflow-hidden" style="height:9px;background:#16191f">
+          <div class="flex-1 rounded-full overflow-hidden" style="height:9px;background:var(--surface2)">
             <div style="width:${pct.toFixed(1)}%;height:9px;background:${barColor};border-radius:5px;transition:width 0.5s ease"></div>
           </div>
           <span class="text-sm font-bold flex-shrink-0" style="min-width:48px;text-align:right;color:${pctColor}">${pct.toFixed(1)}%</span>
         </div>
 
         <div class="grid grid-cols-3 gap-2 mb-3">
-          <div class="rounded-xl p-3 text-center" style="background:#16191f">
-            <div class="text-xs mb-1" style="color:#6b7280">Saved</div>
-            <div class="font-bold text-sm text-emerald-400">${fmt(gs.total)}</div>
+          <div class="rounded-xl p-3 text-center" style="background:var(--surface2)">
+            <div class="text-xs mb-1" style="color:var(--text-3)">Saved</div>
+            <div class="font-bold text-sm text-pos">${fmt(gs.total)}</div>
           </div>
-          <div class="rounded-xl p-3 text-center" style="background:#16191f">
-            <div class="text-xs mb-1" style="color:#6b7280">Target</div>
+          <div class="rounded-xl p-3 text-center" style="background:var(--surface2)">
+            <div class="text-xs mb-1" style="color:var(--text-3)">Target</div>
             <div class="font-bold text-sm">${fmt(g.target)}</div>
           </div>
-          <div class="rounded-xl p-3 text-center" style="background:#16191f">
-            <div class="text-xs mb-1" style="color:#6b7280">Remaining</div>
-            <div class="font-bold text-sm text-amber-400">${fmt(remaining)}</div>
+          <div class="rounded-xl p-3 text-center" style="background:var(--surface2)">
+            <div class="text-xs mb-1" style="color:var(--text-3)">Remaining</div>
+            <div class="font-bold text-sm text-accent">${fmt(remaining)}</div>
           </div>
         </div>
 
-        <div class="rounded-xl p-3 mb-3" style="background:#16191f">
+        <div class="rounded-xl p-3 mb-3" style="background:var(--surface2)">
           <div class="flex justify-between text-sm mb-1.5">
-            <span style="color:#6b7280">Monthly needed</span><span class="font-semibold">${fmt(monthly)}</span>
+            <span style="color:var(--text-3)">Monthly needed</span><span class="font-semibold">${fmt(monthly)}</span>
           </div>
           <div class="flex justify-between text-sm">
-            <span style="color:#6b7280">Daily needed</span><span class="font-semibold">${fmt(daily)}</span>
+            <span style="color:var(--text-3)">Daily needed</span><span class="font-semibold">${fmt(daily)}</span>
           </div>
         </div>
 
         ${linkedCat?`
-        <div class="flex items-center gap-2 mb-3 px-3 py-2 rounded-xl text-xs" style="background:rgba(99,102,241,0.1);border:1px solid rgba(99,102,241,0.2)">
+        <div class="flex items-center gap-2 mb-3 px-3 py-2 rounded-xl text-xs" style="background:var(--accent-dim);border:1px solid var(--accent-border)">
           <span>🔗</span>
-          <span style="color:#a5b4fc">Auto-tracking: ${linkedCat.icon} ${linkedCat.name}${linkedSub?' → '+linkedSub.name:''}</span>
-          <span class="ml-auto font-semibold" style="color:#a5b4fc">+${fmt(gs.auto)}</span>
+          <span style="color:var(--accent-text)">Auto-tracking: ${linkedCat.icon} ${linkedCat.name}${linkedSub?' → '+linkedSub.name:''}</span>
+          <span class="ml-auto font-semibold" style="color:var(--accent-text)">+${fmt(gs.auto)}</span>
         </div>`:''}
 
         <div class="flex gap-2">
-          <button onclick="goalOpenDeposit('${g.id}')" class="flex-1 rounded-xl py-2.5 text-sm font-semibold text-white" style="background:#6366f1;border:none;cursor:pointer">+ Deposit</button>
-          <button onclick="goalToggleHistory('${g.id}')" class="flex-1 rounded-xl py-2.5 text-sm font-semibold" style="background:#16191f;border:1px solid ${isHistoryOpen?'#6366f1':'rgba(255,255,255,0.08)'};color:${isHistoryOpen?'#a5b4fc':'#9ca3af'};cursor:pointer">📋 History (${deposits.length})</button>
+          <button onclick="goalOpenDeposit('${g.id}')" class="flex-1 rounded-xl py-2.5 text-sm font-semibold text-white" style="background:var(--accent);border:none;cursor:pointer">+ Deposit</button>
+          <button onclick="goalToggleHistory('${g.id}')" class="flex-1 rounded-xl py-2.5 text-sm font-semibold" style="background:var(--surface2);border:1px solid ${isHistoryOpen?'var(--accent)':'var(--border)'};color:${isHistoryOpen?'var(--accent-text)':'var(--text-2)'};cursor:pointer">📋 History (${deposits.length})</button>
         </div>
         ${depositForm}${historySection}
       </div>`;
@@ -859,14 +859,14 @@ function renderGoals() {
   const editGoal=goalUI.editGoalId?state.goals.find(g=>g.id===goalUI.editGoalId):null;
   const addModal=goalUI.showAddGoal?`
     <div class="fixed inset-0 flex items-end sm:items-center justify-center" style="z-index:200;background:rgba(0,0,0,0.8)" onclick="goalCloseAdd()">
-      <div class="w-full sm:w-96 rounded-t-3xl sm:rounded-2xl p-6" style="background:#1c2028;border:1px solid rgba(255,255,255,0.08);max-height:92vh;overflow-y:auto" onclick="event.stopPropagation()">
+      <div class="w-full sm:w-96 rounded-t-3xl sm:rounded-2xl p-6" style="background:var(--surface);border:1px solid var(--border);max-height:92vh;overflow-y:auto" onclick="event.stopPropagation()">
         <div class="flex items-center justify-between mb-5">
           <div class="text-lg font-bold">New Goal</div>
-          <button onclick="goalCloseAdd()" style="background:none;border:none;color:#6b7280;cursor:pointer;font-size:22px;line-height:1">×</button>
+          <button onclick="goalCloseAdd()" style="background:none;border:none;color:var(--text-3);cursor:pointer;font-size:22px;line-height:1">×</button>
         </div>
         <div class="grid gap-3 mb-3" style="grid-template-columns:56px 1fr">
           <div><div class="field-label">ICON</div><input type="hidden" id="goal-icon" value="🎯">
-          <button type="button" onclick="iconPickerOpen('goal-icon','goal')" id="goal-icon-btn" onmouseover="this.style.borderColor='#6366f1'" onmouseout="this.style.borderColor='rgba(255,255,255,0.08)'" style="width:100%;height:44px;background:#16191f;border:1px solid rgba(255,255,255,0.08);border-radius:10px;font-size:24px;cursor:pointer;line-height:1;transition:border-color 0.15s">🎯</button></div>
+          <button type="button" onclick="iconPickerOpen('goal-icon','goal')" id="goal-icon-btn" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'" style="width:100%;height:44px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;font-size:24px;cursor:pointer;line-height:1;transition:border-color 0.15s">🎯</button></div>
           <div><div class="field-label">GOAL NAME *</div><input id="goal-name" type="text" placeholder="e.g. Emergency Fund" class="field-input"></div>
         </div>
         <div class="grid grid-cols-2 gap-3 mb-3">
@@ -882,24 +882,24 @@ function renderGoals() {
         <div class="mb-5"><div class="field-label">SUBCATEGORY (optional)</div>
           <select id="goal-subcat" class="field-select"><option value="">— All subcategories —</option></select>
         </div>
-        <div id="goal-err" class="text-red-400 text-xs mb-3"></div>
+        <div id="goal-err" class="text-neg text-xs mb-3"></div>
         <div class="flex gap-3">
-          <button onclick="goalSave()" class="flex-1 rounded-xl py-3 font-semibold text-white text-sm" style="background:#6366f1;border:none;cursor:pointer">Create Goal</button>
-          <button onclick="goalCloseAdd()" class="flex-1 rounded-xl py-3 text-sm" style="background:#16191f;border:1px solid rgba(255,255,255,0.08);color:#9ca3af;cursor:pointer">Cancel</button>
+          <button onclick="goalSave()" class="flex-1 rounded-xl py-3 font-semibold text-white text-sm" style="background:var(--accent);border:none;cursor:pointer">Create Goal</button>
+          <button onclick="goalCloseAdd()" class="flex-1 rounded-xl py-3 text-sm" style="background:var(--surface2);border:1px solid var(--border);color:var(--text-2);cursor:pointer">Cancel</button>
         </div>
       </div>
     </div>`:'';
 
   const editModal=editGoal?`
     <div class="fixed inset-0 flex items-end sm:items-center justify-center" style="z-index:200;background:rgba(0,0,0,0.8)" onclick="goalCancelEdit()">
-      <div class="w-full sm:w-96 rounded-t-3xl sm:rounded-2xl p-6" style="background:#1c2028;border:1px solid rgba(255,255,255,0.08);max-height:92vh;overflow-y:auto" onclick="event.stopPropagation()">
+      <div class="w-full sm:w-96 rounded-t-3xl sm:rounded-2xl p-6" style="background:var(--surface);border:1px solid var(--border);max-height:92vh;overflow-y:auto" onclick="event.stopPropagation()">
         <div class="flex items-center justify-between mb-5">
           <div class="text-lg font-bold">Edit Goal</div>
-          <button onclick="goalCancelEdit()" style="background:none;border:none;color:#6b7280;cursor:pointer;font-size:22px;line-height:1">×</button>
+          <button onclick="goalCancelEdit()" style="background:none;border:none;color:var(--text-3);cursor:pointer;font-size:22px;line-height:1">×</button>
         </div>
         <div class="grid gap-3 mb-3" style="grid-template-columns:56px 1fr">
           <div><div class="field-label">ICON</div><input type="hidden" id="edit-goal-icon" value="${editGoal.icon||'🎯'}">
-          <button type="button" onclick="iconPickerOpen('edit-goal-icon','goal')" id="edit-goal-icon-btn" onmouseover="this.style.borderColor='#6366f1'" onmouseout="this.style.borderColor='rgba(255,255,255,0.08)'" style="width:100%;height:44px;background:#16191f;border:1px solid rgba(255,255,255,0.08);border-radius:10px;font-size:24px;cursor:pointer;line-height:1;transition:border-color 0.15s">${editGoal.icon||'🎯'}</button></div>
+          <button type="button" onclick="iconPickerOpen('edit-goal-icon','goal')" id="edit-goal-icon-btn" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'" style="width:100%;height:44px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;font-size:24px;cursor:pointer;line-height:1;transition:border-color 0.15s">${editGoal.icon||'🎯'}</button></div>
           <div><div class="field-label">GOAL NAME *</div><input id="edit-goal-name" type="text" value="${editGoal.name}" class="field-input"></div>
         </div>
         <div class="grid grid-cols-2 gap-3 mb-3">
@@ -919,8 +919,8 @@ function renderGoals() {
           </select>
         </div>
         <div class="flex gap-3">
-          <button onclick="goalUpdate('${editGoal.id}')" class="flex-1 rounded-xl py-3 font-semibold text-white text-sm" style="background:#6366f1;border:none;cursor:pointer">Save Changes</button>
-          <button onclick="goalCancelEdit()" class="flex-1 rounded-xl py-3 text-sm" style="background:#16191f;border:1px solid rgba(255,255,255,0.08);color:#9ca3af;cursor:pointer">Cancel</button>
+          <button onclick="goalUpdate('${editGoal.id}')" class="flex-1 rounded-xl py-3 font-semibold text-white text-sm" style="background:var(--accent);border:none;cursor:pointer">Save Changes</button>
+          <button onclick="goalCancelEdit()" class="flex-1 rounded-xl py-3 text-sm" style="background:var(--surface2);border:1px solid var(--border);color:var(--text-2);cursor:pointer">Cancel</button>
         </div>
       </div>
     </div>`:'';
@@ -931,15 +931,15 @@ function renderGoals() {
   return `${renderNav()}
     <div class="flex items-center justify-between mb-1">
       <div class="text-2xl font-bold">Goals</div>
-      <button onclick="goalOpenAdd()" class="rounded-xl px-4 py-2.5 text-sm font-semibold text-white flex-shrink-0" style="background:#6366f1;border:none;cursor:pointer">+ Add Goal</button>
+      <button onclick="goalOpenAdd()" class="rounded-xl px-4 py-2.5 text-sm font-semibold text-white flex-shrink-0" style="background:var(--accent);border:none;cursor:pointer">+ Add Goal</button>
     </div>
     <div class="section-label mb-5">${state.goals.length} Goal${state.goals.length!==1?'s':''} · ${fmt(totalSaved)} saved of ${fmt(totalTarget)}</div>
     ${state.goals.length===0?`
       <div class="flex flex-col items-center justify-center py-20 text-center">
         <div class="text-5xl mb-4">🎯</div>
         <div class="text-xl font-bold mb-2">No goals yet</div>
-        <div class="text-sm max-w-xs mb-5" style="color:#6b7280">Set a savings goal and track your progress.</div>
-        <button onclick="goalOpenAdd()" class="rounded-xl px-6 py-3 text-sm font-semibold text-white" style="background:#6366f1;border:none;cursor:pointer">+ Create your first goal</button>
+        <div class="text-sm max-w-xs mb-5" style="color:var(--text-3)">Set a savings goal and track your progress.</div>
+        <button onclick="goalOpenAdd()" class="rounded-xl px-6 py-3 text-sm font-semibold text-white" style="background:var(--accent);border:none;cursor:pointer">+ Create your first goal</button>
       </div>`:state.goals.map(g=>goalCard(g)).join('')}
     ${addModal}${editModal}`;
 }
@@ -949,7 +949,7 @@ function renderAccounts() {
   const TC = {
     bank:    { label:'Bank',     icon:'🏦', color:'#3b82f6', bg:'rgba(59,130,246,0.13)'  },
     ewallet: { label:'E-Wallet', icon:'📱', color:'#8b5cf6', bg:'rgba(139,92,246,0.13)'  },
-    cash:    { label:'Cash',     icon:'💵', color:'#10b981', bg:'rgba(16,185,129,0.13)'  },
+    cash:    { label:'Cash',     icon:'💵', color:'var(--green-strong)', bg:'var(--green-dim)'  },
   };
   const banks    = state.accounts.filter(a=>(a.type||'bank')==='bank');
   const ewallets = state.accounts.filter(a=>a.type==='ewallet');
@@ -962,18 +962,18 @@ function renderAccounts() {
   function acctCard(a) {
     const conf=TC[a.type||'bank'];
     if (acctUI.deleteAcctId===a.id) return `
-      <div class="rounded-xl p-4 mb-2" style="background:#1a0f0f;border:1px solid #7f1d1d">
-        <div class="text-sm mb-3" style="color:#fca5a5">Delete <strong>${a.name}</strong>? Cannot be undone.</div>
+      <div class="rounded-xl p-4 mb-2" style="background:var(--danger-surface);border:1px solid var(--danger-border)">
+        <div class="text-sm mb-3" style="color:var(--danger-text)">Delete <strong>${a.name}</strong>? Cannot be undone.</div>
         <div class="flex gap-2">
-          <button onclick="acctConfirmDelete()" class="text-xs px-4 py-2 rounded-lg font-semibold" style="background:#ef4444;border:none;color:#fff;cursor:pointer">Delete</button>
-          <button onclick="acctCancelDelete()" class="text-xs px-4 py-2 rounded-lg" style="background:rgba(255,255,255,0.08);border:none;color:#9ca3af;cursor:pointer">Cancel</button>
+          <button onclick="acctConfirmDelete()" class="text-xs px-4 py-2 rounded-lg font-semibold" style="background:var(--red-strong);border:none;color:#fff;cursor:pointer">Delete</button>
+          <button onclick="acctCancelDelete()" class="text-xs px-4 py-2 rounded-lg" style="background:var(--btn-ghost);border:none;color:var(--text-2);cursor:pointer">Cancel</button>
         </div>
       </div>`;
     if (acctUI.editAcctId===a.id) return `
-      <div class="rounded-xl p-4 mb-2" style="background:#16191f;border:1px solid #6366f1">
+      <div class="rounded-xl p-4 mb-2" style="background:var(--surface2);border:1px solid var(--accent)">
         <div class="grid gap-3 mb-3" style="grid-template-columns:56px 1fr">
           <div><div class="field-label">ICON</div><input type="hidden" id="edit-acct-icon-${a.id}" value="${a.icon||conf.icon}">
-          <button type="button" onclick="iconPickerOpen('edit-acct-icon-${a.id}','${a.type||'bank'}')" onmouseover="this.style.borderColor='#6366f1'" onmouseout="this.style.borderColor='rgba(255,255,255,0.08)'" id="edit-acct-icon-${a.id}-btn" style="width:100%;height:44px;background:#16191f;border:1px solid rgba(255,255,255,0.08);border-radius:10px;font-size:24px;cursor:pointer;line-height:1;transition:border-color 0.15s">${a.icon||conf.icon}</button></div>
+          <button type="button" onclick="iconPickerOpen('edit-acct-icon-${a.id}','${a.type||'bank'}')" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'" id="edit-acct-icon-${a.id}-btn" style="width:100%;height:44px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;font-size:24px;cursor:pointer;line-height:1;transition:border-color 0.15s">${a.icon||conf.icon}</button></div>
           <div><div class="field-label">NAME</div><input id="edit-acct-name-${a.id}" value="${a.name}" class="field-input"></div>
         </div>
         <div class="grid grid-cols-2 gap-3 mb-3">
@@ -981,21 +981,21 @@ function renderAccounts() {
           <div><div class="field-label">MAINTAINING BAL. (₱)</div><input id="edit-acct-mbal-${a.id}" type="number" step="0.01" value="${a.maintainingBalance||0}" class="field-input" title="Amount that must stay in account"></div>
         </div>
         <div class="flex gap-2">
-          <button onclick="acctUpdate('${a.id}')" class="flex-1 rounded-lg py-2 text-sm font-semibold text-white" style="background:#6366f1;border:none;cursor:pointer">Save</button>
-          <button onclick="acctCancelEdit()" class="flex-1 rounded-lg py-2 text-sm" style="background:rgba(255,255,255,0.08);border:none;color:#9ca3af;cursor:pointer">Cancel</button>
+          <button onclick="acctUpdate('${a.id}')" class="flex-1 rounded-lg py-2 text-sm font-semibold text-white" style="background:var(--accent);border:none;cursor:pointer">Save</button>
+          <button onclick="acctCancelEdit()" class="flex-1 rounded-lg py-2 text-sm" style="background:var(--btn-ghost);border:none;color:var(--text-2);cursor:pointer">Cancel</button>
         </div>
       </div>`;
     return `
-      <div class="flex items-center gap-3 p-3 rounded-xl mb-2" style="background:#16191f">
-        <div class="flex-shrink-0 flex items-center justify-center rounded-xl text-xl" style="width:42px;height:42px;background:${conf.bg}">${a.icon||conf.icon}</div>
+      <div class="flex items-center gap-3 p-3 rounded-xl mb-2" style="background:var(--surface2)">
+        <div class="flex-shrink-0 flex items-center justify-center rounded-xl text-xl overflow-hidden" style="width:42px;height:42px;background:${conf.bg}">${brandBadge(a.name, a.icon||conf.icon)}</div>
         <div class="flex-1 min-w-0">
-          <div class="text-sm font-semibold" style="color:#f1f1f3">${a.name}</div>
-          <div class="text-xs" style="color:#6b7280">${conf.label}${a.maintainingBalance>0?` · <span style="color:#f59e0b">min ${fmt(a.maintainingBalance)}</span>`:''}</div>
+          <div class="text-sm font-semibold" style="color:var(--text)">${a.name}</div>
+          <div class="text-xs" style="color:var(--text-3)">${conf.label}${a.maintainingBalance>0?` · <span style="color:var(--amber)">min ${fmt(a.maintainingBalance)}</span>`:''}</div>
         </div>
         <div class="font-semibold text-sm flex-shrink-0">${fmt2(a.balance)}</div>
         <div class="flex gap-1 flex-shrink-0">
-          <button onclick="acctOpenEdit('${a.id}')" style="background:#1c2028;border:none;color:#9ca3af;cursor:pointer;border-radius:8px;padding:5px 8px;font-size:13px">✏️</button>
-          <button onclick="acctAskDelete('${a.id}')" style="background:#1c2028;border:none;color:#9ca3af;cursor:pointer;border-radius:8px;padding:5px 8px;font-size:13px">🗑️</button>
+          <button onclick="acctOpenEdit('${a.id}')" style="background:var(--surface);border:none;color:var(--text-2);cursor:pointer;border-radius:8px;padding:5px 8px;font-size:13px">✏️</button>
+          <button onclick="acctAskDelete('${a.id}')" style="background:var(--surface);border:none;color:var(--text-2);cursor:pointer;border-radius:8px;padding:5px 8px;font-size:13px">🗑️</button>
         </div>
       </div>`;
   }
@@ -1003,19 +1003,19 @@ function renderAccounts() {
   function section(title, list, type, total) {
     const conf=TC[type];
     return `
-      <div class="rounded-2xl p-4 mb-4" style="background:#1c2028">
+      <div class="rounded-2xl p-4 mb-4" style="background:var(--surface)">
         <div class="flex items-center justify-between mb-3">
           <div class="flex items-center gap-2">
             <span>${conf.icon}</span><span class="font-semibold">${title}</span>
             <span class="text-xs px-2 py-0.5 rounded-full font-medium" style="background:${conf.bg};color:${conf.color}">${list.length}</span>
           </div>
           <div class="flex items-center gap-3">
-            <span class="text-sm font-semibold" style="color:#9ca3af">${fmt2(total)}</span>
-            <button onclick="acctOpenAdd('${type}')" class="text-xs px-3 py-1.5 rounded-lg font-semibold text-white" style="background:#6366f1;border:none;cursor:pointer">+ Add</button>
+            <span class="text-sm font-semibold" style="color:var(--text-2)">${fmt2(total)}</span>
+            <button onclick="acctOpenAdd('${type}')" class="text-xs px-3 py-1.5 rounded-lg font-semibold text-white" style="background:var(--accent);border:none;cursor:pointer">+ Add</button>
           </div>
         </div>
         ${list.map(a=>acctCard(a)).join('')}
-        ${list.length===0?`<div class="text-center py-4 text-sm" style="color:#6b7280">No ${title.toLowerCase()} added yet</div>`:''}
+        ${list.length===0?`<div class="text-center py-4 text-sm" style="color:var(--text-3)">No ${title.toLowerCase()} added yet</div>`:''}
       </div>`;
   }
 
@@ -1028,24 +1028,24 @@ function renderAccounts() {
     const stmtPayments = ccStatementPayments(c.id);
     const stmtRemaining = c.lastStatement > 0 ? Math.max(0, c.lastStatement - stmtPayments) : 0;
     const stmtFullyPaid = c.lastStatement > 0 && stmtRemaining === 0;
-    const barColor = pct>80?'#ef4444':pct>50?'#f59e0b':'#10b981';
+    const barColor = pct>80?'var(--red-strong)':pct>50?'var(--amber)':'var(--green-strong)';
 
     // ── DELETE confirm ────────────────────────────────────
     if (acctUI.deleteCCId===c.id) return `
-      <div class="rounded-xl p-4 mb-3" style="background:#1a0f0f;border:1px solid #7f1d1d">
-        <div class="text-sm mb-3" style="color:#fca5a5">Delete <strong>${c.name}</strong>? Cannot be undone.</div>
+      <div class="rounded-xl p-4 mb-3" style="background:var(--danger-surface);border:1px solid var(--danger-border)">
+        <div class="text-sm mb-3" style="color:var(--danger-text)">Delete <strong>${c.name}</strong>? Cannot be undone.</div>
         <div class="flex gap-2">
-          <button onclick="ccConfirmDelete()" class="text-xs px-4 py-2 rounded-lg font-semibold" style="background:#ef4444;border:none;color:#fff;cursor:pointer">Delete</button>
-          <button onclick="ccCancelDelete()" class="text-xs px-4 py-2 rounded-lg" style="background:rgba(255,255,255,0.08);border:none;color:#9ca3af;cursor:pointer">Cancel</button>
+          <button onclick="ccConfirmDelete()" class="text-xs px-4 py-2 rounded-lg font-semibold" style="background:var(--red-strong);border:none;color:#fff;cursor:pointer">Delete</button>
+          <button onclick="ccCancelDelete()" class="text-xs px-4 py-2 rounded-lg" style="background:var(--btn-ghost);border:none;color:var(--text-2);cursor:pointer">Cancel</button>
         </div>
       </div>`;
 
     // ── EDIT form ─────────────────────────────────────────
     if (acctUI.editCCId===c.id) return `
-      <div class="rounded-xl p-4 mb-3" style="background:#16191f;border:1px solid #6366f1">
+      <div class="rounded-xl p-4 mb-3" style="background:var(--surface2);border:1px solid var(--accent)">
         <div class="grid gap-3 mb-3" style="grid-template-columns:56px 1fr">
           <div><div class="field-label">ICON</div><input type="hidden" id="edit-cc-icon-${c.id}" value="${c.icon||'💳'}">
-          <button type="button" onclick="iconPickerOpen('edit-cc-icon-${c.id}','cc')" id="edit-cc-icon-${c.id}-btn" onmouseover="this.style.borderColor='#6366f1'" onmouseout="this.style.borderColor='rgba(255,255,255,0.08)'" style="width:100%;height:44px;background:#16191f;border:1px solid rgba(255,255,255,0.08);border-radius:10px;font-size:24px;cursor:pointer;line-height:1;transition:border-color 0.15s">${c.icon||'💳'}</button></div>
+          <button type="button" onclick="iconPickerOpen('edit-cc-icon-${c.id}','cc')" id="edit-cc-icon-${c.id}-btn" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'" style="width:100%;height:44px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;font-size:24px;cursor:pointer;line-height:1;transition:border-color 0.15s">${c.icon||'💳'}</button></div>
           <div><div class="field-label">NAME</div><input id="edit-cc-name-${c.id}" value="${c.name}" class="field-input"></div>
         </div>
         <div class="grid grid-cols-2 gap-3 mb-3">
@@ -1061,19 +1061,19 @@ function renderAccounts() {
           <div><div class="field-label">MIN. AMOUNT DUE (₱)</div><input id="edit-cc-min-due-${c.id}" type="number" step="0.01" value="${c.minDue||0}" class="field-input" title="Minimum Amount Due from your last statement"></div>
         </div>
         <div class="flex gap-2">
-          <button onclick="ccUpdate('${c.id}')" class="flex-1 rounded-lg py-2 text-sm font-semibold text-white" style="background:#6366f1;border:none;cursor:pointer">Save</button>
-          <button onclick="ccCancelEdit()" class="flex-1 rounded-lg py-2 text-sm" style="background:rgba(255,255,255,0.08);border:none;color:#9ca3af;cursor:pointer">Cancel</button>
+          <button onclick="ccUpdate('${c.id}')" class="flex-1 rounded-lg py-2 text-sm font-semibold text-white" style="background:var(--accent);border:none;cursor:pointer">Save</button>
+          <button onclick="ccCancelEdit()" class="flex-1 rounded-lg py-2 text-sm" style="background:var(--btn-ghost);border:none;color:var(--text-2);cursor:pointer">Cancel</button>
         </div>
       </div>`;
 
     // ── PAYMENT form ──────────────────────────────────────
     if (acctUI.paymentCCId===c.id) return `
-      <div class="rounded-xl p-4 mb-3" style="background:#16191f;border:1px solid #10b981">
+      <div class="rounded-xl p-4 mb-3" style="background:var(--surface2);border:1px solid var(--green-strong)">
         <div class="flex items-center gap-2 mb-4">
           <span style="font-size:20px">💳</span>
           <div>
-            <div class="font-semibold text-sm" style="color:#f1f1f3">Record Payment — ${c.name}</div>
-            <div class="text-xs" style="color:#6b7280">Current Balance: <span style="color:#f87171;font-weight:600">${fmt(c.outstanding)}</span></div>
+            <div class="font-semibold text-sm" style="color:var(--text)">Record Payment — ${c.name}</div>
+            <div class="text-xs" style="color:var(--text-3)">Current Balance: <span style="color:var(--red);font-weight:600">${fmt(c.outstanding)}</span></div>
           </div>
         </div>
         <div class="mb-3">
@@ -1082,11 +1082,11 @@ function renderAccounts() {
         </div>
         <div class="mb-3">
           <div class="field-label">PAYMENT AMOUNT (₱)</div>
-          <input id="cc-pay-amt" type="number" step="0.01" min="0" value="${c.lastStatement>0?c.lastStatement:c.outstanding}" class="field-input" style="font-size:18px;font-weight:700;color:#34d399">
+          <input id="cc-pay-amt" type="number" step="0.01" min="0" value="${c.lastStatement>0?c.lastStatement:c.outstanding}" class="field-input" style="font-size:18px;font-weight:700;color:var(--green)">
           <div class="flex gap-2 mt-2 flex-wrap">
-            <button onclick="document.getElementById('cc-pay-amt').value='${c.outstanding}'" class="text-xs px-3 py-1.5 rounded-lg" style="background:#16191f;border:1px solid rgba(255,255,255,0.08);color:#9ca3af;cursor:pointer">Current bal · ${fmt(c.outstanding)}</button>
-            ${c.lastStatement>0?`<button onclick="document.getElementById('cc-pay-amt').value='${c.lastStatement}'" class="text-xs px-3 py-1.5 rounded-lg" style="background:#16191f;border:1px solid rgba(245,158,11,0.4);color:#fbbf24;cursor:pointer">Stmt bal · ${fmt(c.lastStatement)}</button>`:''}
-            ${c.minDue>0?`<button onclick="document.getElementById('cc-pay-amt').value='${c.minDue}'" class="text-xs px-3 py-1.5 rounded-lg" style="background:#16191f;border:1px solid rgba(255,255,255,0.08);color:#9ca3af;cursor:pointer">Min due · ${fmt(c.minDue)}</button>`:''}
+            <button onclick="document.getElementById('cc-pay-amt').value='${c.outstanding}'" class="text-xs px-3 py-1.5 rounded-lg" style="background:var(--surface2);border:1px solid var(--border);color:var(--text-2);cursor:pointer">Current bal · ${fmt(c.outstanding)}</button>
+            ${c.lastStatement>0?`<button onclick="document.getElementById('cc-pay-amt').value='${c.lastStatement}'" class="text-xs px-3 py-1.5 rounded-lg" style="background:var(--surface2);border:1px solid var(--amber-border);color:var(--amber-2);cursor:pointer">Stmt bal · ${fmt(c.lastStatement)}</button>`:''}
+            ${c.minDue>0?`<button onclick="document.getElementById('cc-pay-amt').value='${c.minDue}'" class="text-xs px-3 py-1.5 rounded-lg" style="background:var(--surface2);border:1px solid var(--border);color:var(--text-2);cursor:pointer">Min due · ${fmt(c.minDue)}</button>`:''}
           </div>
         </div>
         <div class="mb-4">
@@ -1096,10 +1096,10 @@ function renderAccounts() {
             ${state.accounts.map(a=>`<option value="${a.id}">${a.icon||'🏦'} ${a.name}</option>`).join('')}
           </select>
         </div>
-        <div id="cc-pay-err" class="text-red-400 text-xs mb-3"></div>
+        <div id="cc-pay-err" class="text-neg text-xs mb-3"></div>
         <div class="flex gap-2">
-          <button onclick="ccRecordPayment('${c.id}')" class="flex-1 rounded-lg py-2.5 text-sm font-semibold text-white" style="background:#10b981;border:none;cursor:pointer">✅ Record Payment</button>
-          <button onclick="ccCancelPayment()" class="flex-1 rounded-lg py-2.5 text-sm" style="background:rgba(255,255,255,0.08);border:none;color:#9ca3af;cursor:pointer">Cancel</button>
+          <button onclick="ccRecordPayment('${c.id}')" class="flex-1 rounded-lg py-2.5 text-sm font-semibold text-white" style="background:var(--green-strong);border:none;cursor:pointer">✅ Record Payment</button>
+          <button onclick="ccCancelPayment()" class="flex-1 rounded-lg py-2.5 text-sm" style="background:var(--btn-ghost);border:none;color:var(--text-2);cursor:pointer">Cancel</button>
         </div>
       </div>`;
 
@@ -1114,150 +1114,150 @@ function renderAccounts() {
     const nearCutoff   = typeof daysToC==='number' && daysToC<=3;
 
     return `
-      <div class="rounded-xl p-4 mb-3" style="background:#16191f;border:1px solid ${isPaid?'rgba(16,185,129,0.3)':'transparent'}">
+      <div class="rounded-xl p-4 mb-3" style="background:var(--surface2);border:1px solid ${isPaid?'var(--green-dim)':'transparent'}">
 
         <!-- Header -->
         <div class="flex items-start justify-between mb-3">
           <div class="flex items-center gap-3">
-            <div class="flex-shrink-0 flex items-center justify-center rounded-xl text-xl" style="width:42px;height:42px;background:rgba(245,158,11,0.12)">${c.icon||'💳'}</div>
+            <div class="flex-shrink-0 flex items-center justify-center rounded-xl text-xl overflow-hidden" style="width:42px;height:42px;background:var(--amber-dim)">${brandBadge(c.name, c.icon||'💳')}</div>
             <div>
               <div class="flex items-center gap-2 flex-wrap">
-                <div class="font-semibold text-sm" style="color:#f1f1f3">${c.name}</div>
-                ${isPaid?`<span class="text-xs px-2 py-0.5 rounded-full font-semibold" style="background:rgba(16,185,129,0.15);color:#34d399">✅ Paid</span>`:''}
-                ${nearDue&&!isPaid?`<span class="text-xs px-2 py-0.5 rounded-full font-semibold" style="background:rgba(248,113,113,0.15);color:#f87171">⚠️ Due soon</span>`:''}
+                <div class="font-semibold text-sm" style="color:var(--text)">${c.name}</div>
+                ${isPaid?`<span class="text-xs px-2 py-0.5 rounded-full font-semibold" style="background:var(--green-dim);color:var(--green)">✅ Paid</span>`:''}
+                ${nearDue&&!isPaid?`<span class="text-xs px-2 py-0.5 rounded-full font-semibold" style="background:var(--red-dim);color:var(--red)">⚠️ Due soon</span>`:''}
               </div>
-              <div class="text-xs mt-0.5" style="color:#6b7280">Cut-off ${c.cutoffDay||22}${sfx(c.cutoffDay||22)} · Due ${c.dueDay}${sfx(c.dueDay)}</div>
+              <div class="text-xs mt-0.5" style="color:var(--text-3)">Cut-off ${c.cutoffDay||22}${sfx(c.cutoffDay||22)} · Due ${c.dueDay}${sfx(c.dueDay)}</div>
             </div>
           </div>
           <div class="flex gap-1 flex-shrink-0">
-            <button onclick="ccOpenPayment('${c.id}')" title="Record Payment" style="background:#0d2b1e;border:1px solid rgba(16,185,129,0.3);color:#34d399;cursor:pointer;border-radius:8px;padding:5px 8px;font-size:12px;font-weight:600">Pay</button>
-            <button onclick="ccOpenEdit('${c.id}')" style="background:#1c2028;border:none;color:#9ca3af;cursor:pointer;border-radius:8px;padding:5px 8px;font-size:13px">✏️</button>
-            <button onclick="ccAskDelete('${c.id}')" style="background:#1c2028;border:none;color:#9ca3af;cursor:pointer;border-radius:8px;padding:5px 8px;font-size:13px">🗑️</button>
+            <button onclick="ccOpenPayment('${c.id}')" title="Record Payment" style="background:var(--green-dim);border:1px solid var(--green-dim);color:var(--green);cursor:pointer;border-radius:8px;padding:5px 8px;font-size:12px;font-weight:600">Pay</button>
+            <button onclick="ccOpenEdit('${c.id}')" style="background:var(--surface);border:none;color:var(--text-2);cursor:pointer;border-radius:8px;padding:5px 8px;font-size:13px">✏️</button>
+            <button onclick="ccAskDelete('${c.id}')" style="background:var(--surface);border:none;color:var(--text-2);cursor:pointer;border-radius:8px;padding:5px 8px;font-size:13px">🗑️</button>
           </div>
         </div>
 
         <!-- Billing Cycle Timeline -->
-        <div class="rounded-lg p-3 mb-3" style="background:#0e1014;border:1px solid rgba(255,255,255,0.05)">
-          <div class="flex items-center justify-between text-xs mb-2" style="color:#6b7280">
+        <div class="rounded-lg p-3 mb-3" style="background:var(--bg);border:1px solid var(--border2)">
+          <div class="flex items-center justify-between text-xs mb-2" style="color:var(--text-3)">
             <span>📅 Billing Cycle</span>
-            <span style="color:${nearCutoff?'#f87171':'#6b7280'}">${pastCutoff?'Grace period':''+daysToC+' days to cut-off'}</span>
+            <span style="color:${nearCutoff?'var(--red)':'var(--text-3)'}">${pastCutoff?'Grace period':''+daysToC+' days to cut-off'}</span>
           </div>
           <div class="flex items-center gap-1 text-xs">
             <div class="text-center flex-1">
-              <div style="color:#a5b4fc;font-weight:600">${startLabel}</div>
-              <div style="color:#6b7280;margin-top:1px">Cycle start</div>
+              <div style="color:var(--accent-text);font-weight:600">${startLabel}</div>
+              <div style="color:var(--text-3);margin-top:1px">Cycle start</div>
             </div>
-            <div style="flex:2;height:2px;background:linear-gradient(90deg,#6366f1,${pastCutoff?'#6366f1':'rgba(255,255,255,0.05)'});border-radius:1px;position:relative">
-              ${!pastCutoff?`<div style="position:absolute;top:-3px;width:8px;height:8px;border-radius:50%;background:#6366f1;left:${Math.min(95,Math.max(2,100-(daysToC/(daysToC+(now.getDate()-parseInt(dates.cycleStart?.split('-')[2]||1)+1||1))*100)))}%;transform:translateX(-50%)"></div>`:''}
+            <div style="flex:2;height:2px;background:linear-gradient(90deg,var(--accent),${pastCutoff?'var(--accent)':'var(--border2)'});border-radius:1px;position:relative">
+              ${!pastCutoff?`<div style="position:absolute;top:-3px;width:8px;height:8px;border-radius:50%;background:var(--accent);left:${Math.min(95,Math.max(2,100-(daysToC/(daysToC+(now.getDate()-parseInt(dates.cycleStart?.split('-')[2]||1)+1||1))*100)))}%;transform:translateX(-50%)"></div>`:''}
             </div>
             <div class="text-center flex-1">
-              <div style="color:${pastCutoff?'#34d399':nearCutoff?'#f87171':'#9ca3af'};font-weight:600">${cutoffLabel}</div>
-              <div style="color:#6b7280;margin-top:1px">Cut-off</div>
+              <div style="color:${pastCutoff?'var(--green)':nearCutoff?'var(--red)':'var(--text-2)'};font-weight:600">${cutoffLabel}</div>
+              <div style="color:var(--text-3);margin-top:1px">Cut-off</div>
             </div>
-            <div style="flex:1;height:2px;background:${pastCutoff?'linear-gradient(90deg,#10b981,rgba(255,255,255,0.05))':'rgba(255,255,255,0.05)'};border-radius:1px"></div>
+            <div style="flex:1;height:2px;background:${pastCutoff?'linear-gradient(90deg,var(--green-strong),var(--border2))':'var(--border2)'};border-radius:1px"></div>
             <div class="text-center flex-1">
-              <div style="color:${nearDue?'#f87171':'#9ca3af'};font-weight:600">${dueLabel}</div>
-              <div style="color:#6b7280;margin-top:1px">Due date</div>
+              <div style="color:${nearDue?'var(--red)':'var(--text-2)'};font-weight:600">${dueLabel}</div>
+              <div style="color:var(--text-3);margin-top:1px">Due date</div>
             </div>
           </div>
-          <div class="flex justify-between text-xs mt-2" style="color:#6b7280">
+          <div class="flex justify-between text-xs mt-2" style="color:var(--text-3)">
             <span>${pastCutoff?'Statement closed':'Charges here → this bill'}</span>
-            <span style="color:${nearDue?'#f87171':'#6b7280'}">${daysToD}d to pay</span>
+            <span style="color:${nearDue?'var(--red)':'var(--text-3)'}">${daysToD}d to pay</span>
           </div>
         </div>
 
         <!-- Balance Grid -->
         <div class="grid grid-cols-2 gap-2 mb-3">
-          <div class="rounded-lg p-3" style="background:#1c2028;${c.lastStatement>0?'grid-column:span 2':''};${c.lastStatement>0?'':''}">
-            <div class="text-xs mb-1" style="color:#6b7280">Statement Balance</div>
+          <div class="rounded-lg p-3" style="background:var(--surface);${c.lastStatement>0?'grid-column:span 2':''};${c.lastStatement>0?'':''}">
+            <div class="text-xs mb-1" style="color:var(--text-3)">Statement Balance</div>
             ${c.lastStatement>0?`
             <div class="flex items-start justify-between">
               <div>
-                <div class="text-sm font-bold text-amber-400">${fmt(c.lastStatement)}</div>
-                <div class="text-xs mt-0.5" style="color:#6b7280">Last billed amount</div>
+                <div class="text-sm font-bold text-accent">${fmt(c.lastStatement)}</div>
+                <div class="text-xs mt-0.5" style="color:var(--text-3)">Last billed amount</div>
               </div>
               <div class="text-right">
                 ${stmtFullyPaid
-                  ? `<div class="text-xs px-2 py-1 rounded-lg font-semibold" style="background:rgba(16,185,129,0.15);color:#34d399">✅ Fully Paid</div>`
-                  : `<div class="text-xs" style="color:#9ca3af">Paid <span style="color:#34d399;font-weight:600">${fmt(stmtPayments)}</span></div>
-                     <div class="text-xs mt-0.5" style="color:#f87171;font-weight:600">Still owed ${fmt(stmtRemaining)}</div>`
+                  ? `<div class="text-xs px-2 py-1 rounded-lg font-semibold" style="background:var(--green-dim);color:var(--green)">✅ Fully Paid</div>`
+                  : `<div class="text-xs" style="color:var(--text-2)">Paid <span style="color:var(--green);font-weight:600">${fmt(stmtPayments)}</span></div>
+                     <div class="text-xs mt-0.5" style="color:var(--red);font-weight:600">Still owed ${fmt(stmtRemaining)}</div>`
                 }
               </div>
             </div>
             ${stmtPayments>0&&!stmtFullyPaid?`
-            <div class="mt-2 rounded-full overflow-hidden" style="height:3px;background:rgba(255,255,255,0.08)">
-              <div style="width:${Math.min(100,(stmtPayments/c.lastStatement)*100).toFixed(1)}%;height:3px;background:#34d399;border-radius:2px"></div>
+            <div class="mt-2 rounded-full overflow-hidden" style="height:3px;background:var(--btn-ghost)">
+              <div style="width:${Math.min(100,(stmtPayments/c.lastStatement)*100).toFixed(1)}%;height:3px;background:var(--green);border-radius:2px"></div>
             </div>`:''}`
-            :`<div class="text-sm font-bold" style="color:#6b7280">—</div>
-            <div class="text-xs mt-0.5" style="color:#6b7280">No statement set</div>`}
+            :`<div class="text-sm font-bold" style="color:var(--text-3)">—</div>
+            <div class="text-xs mt-0.5" style="color:var(--text-3)">No statement set</div>`}
           </div>
-          <div class="rounded-lg p-3" style="background:#1c2028">
-            <div class="text-xs mb-1" style="color:#6b7280">Current Balance</div>
-            <div class="text-sm font-bold ${isPaid?'text-emerald-400':'text-red-400'}">${isPaid?'Paid ✓':fmt(c.outstanding)}</div>
-            <div class="text-xs mt-0.5" style="color:#6b7280">${newCharges>0?`+${fmt(newCharges)} new charges`:'No new charges'}</div>
+          <div class="rounded-lg p-3" style="background:var(--surface)">
+            <div class="text-xs mb-1" style="color:var(--text-3)">Current Balance</div>
+            <div class="text-sm font-bold ${isPaid?'text-pos':'text-neg'}">${isPaid?'Paid ✓':fmt(c.outstanding)}</div>
+            <div class="text-xs mt-0.5" style="color:var(--text-3)">${newCharges>0?`+${fmt(newCharges)} new charges`:'No new charges'}</div>
           </div>
-          <div class="rounded-lg p-3" style="background:#1c2028">
-            <div class="text-xs mb-1" style="color:#6b7280">Available Credit</div>
-            <div class="text-base font-bold text-emerald-400">${fmt(avail)}</div>
+          <div class="rounded-lg p-3" style="background:var(--surface)">
+            <div class="text-xs mb-1" style="color:var(--text-3)">Available Credit</div>
+            <div class="text-base font-bold text-pos">${fmt(avail)}</div>
           </div>
-          <div class="rounded-lg p-3" style="background:#1c2028">
-            <div class="text-xs mb-1" style="color:#6b7280">Credit Limit</div>
-            <div class="text-base font-bold" style="color:#f1f1f3">${fmt(c.limit)}</div>
+          <div class="rounded-lg p-3" style="background:var(--surface)">
+            <div class="text-xs mb-1" style="color:var(--text-3)">Credit Limit</div>
+            <div class="text-base font-bold" style="color:var(--text)">${fmt(c.limit)}</div>
           </div>
         </div>
 
         ${c.minDue>0&&!isPaid?`
-        <div class="flex items-center justify-between py-2 px-3 rounded-lg mb-3" style="background:rgba(245,158,11,0.06);border:1px solid rgba(245,158,11,0.2)">
-          <div class="text-xs" style="color:#9ca3af">⚠️ Minimum Amount Due <span style="color:#6b7280">· pay by ${dueLabel}</span></div>
-          <div class="text-sm font-bold text-amber-400">${fmt(c.minDue)}</div>
+        <div class="flex items-center justify-between py-2 px-3 rounded-lg mb-3" style="background:var(--amber-dim);border:1px solid var(--amber-border)">
+          <div class="text-xs" style="color:var(--text-2)">⚠️ Minimum Amount Due <span style="color:var(--text-3)">· pay by ${dueLabel}</span></div>
+          <div class="text-sm font-bold text-accent">${fmt(c.minDue)}</div>
         </div>`:''}
 
         <!-- Utilization bar -->
         <div class="flex items-center gap-2">
-          <div class="flex-1 rounded-full overflow-hidden" style="height:5px;background:#1c2028">
-            <div style="width:${pct.toFixed(1)}%;height:5px;background:${isPaid?'#10b981':barColor};border-radius:3px;transition:width 0.3s"></div>
+          <div class="flex-1 rounded-full overflow-hidden" style="height:5px;background:var(--surface)">
+            <div style="width:${pct.toFixed(1)}%;height:5px;background:${isPaid?'var(--green-strong)':barColor};border-radius:3px;transition:width 0.3s"></div>
           </div>
-          <span class="text-xs flex-shrink-0" style="color:#6b7280">${pct.toFixed(1)}% used</span>
+          <span class="text-xs flex-shrink-0" style="color:var(--text-3)">${pct.toFixed(1)}% used</span>
         </div>
       </div>`;
   }
   const addAcctModal = acctUI.showAddAcct ? `
     <div class="fixed inset-0 flex items-end sm:items-center justify-center" style="z-index:200;background:rgba(0,0,0,0.8)" onclick="acctCloseAdd()">
-      <div class="w-full sm:w-96 rounded-t-3xl sm:rounded-2xl p-6" style="background:#1c2028;border:1px solid rgba(255,255,255,0.08);max-height:92vh;overflow-y:auto" onclick="event.stopPropagation()">
+      <div class="w-full sm:w-96 rounded-t-3xl sm:rounded-2xl p-6" style="background:var(--surface);border:1px solid var(--border);max-height:92vh;overflow-y:auto" onclick="event.stopPropagation()">
         <div class="flex items-center justify-between mb-5">
           <div class="text-lg font-bold">Add Account</div>
-          <button onclick="acctCloseAdd()" style="background:none;border:none;color:#6b7280;cursor:pointer;font-size:22px;line-height:1">×</button>
+          <button onclick="acctCloseAdd()" style="background:none;border:none;color:var(--text-3);cursor:pointer;font-size:22px;line-height:1">×</button>
         </div>
-        <div class="inline-flex p-1 rounded-xl mb-4 gap-1 w-full" style="background:#16191f;border:1px solid rgba(255,255,255,0.05)">
-          ${['bank','ewallet','cash'].map(t=>`<button onclick="acctSetAddType('${t}')" class="flex-1 rounded-lg py-2 text-xs font-medium" style="${acctUI.addType===t?'background:#1c2028;color:#f1f1f3;border:1px solid rgba(255,255,255,0.08)':'background:transparent;color:#6b7280;border:1px solid transparent'}">${t==='bank'?'🏦 Bank':t==='ewallet'?'📱 E-Wallet':'💵 Cash'}</button>`).join('')}
+        <div class="inline-flex p-1 rounded-xl mb-4 gap-1 w-full" style="background:var(--surface2);border:1px solid var(--border2)">
+          ${['bank','ewallet','cash'].map(t=>`<button onclick="acctSetAddType('${t}')" class="flex-1 rounded-lg py-2 text-xs font-medium" style="${acctUI.addType===t?'background:var(--surface);color:var(--text);border:1px solid var(--border)':'background:transparent;color:var(--text-3);border:1px solid transparent'}">${t==='bank'?'🏦 Bank':t==='ewallet'?'📱 E-Wallet':'💵 Cash'}</button>`).join('')}
         </div>
         <div class="grid gap-3 mb-3" style="grid-template-columns:56px 1fr">
           <div><div class="field-label">ICON</div><input id="acct-icon" type="hidden" value="${acctUI.addType==='bank'?'🏦':acctUI.addType==='ewallet'?'📱':'💵'}">
-          <button type="button" id="acct-icon-btn" onclick="iconPickerOpen('acct-icon',acctUI.addType)" onmouseover="this.style.borderColor='#6366f1'" onmouseout="this.style.borderColor='rgba(255,255,255,0.08)'" style="width:100%;height:44px;background:#16191f;border:1px solid rgba(255,255,255,0.08);border-radius:10px;font-size:24px;cursor:pointer;line-height:1;transition:border-color 0.15s">${acctUI.addType==='bank'?'🏦':acctUI.addType==='ewallet'?'📱':'💵'}</button></div>
+          <button type="button" id="acct-icon-btn" onclick="iconPickerOpen('acct-icon',acctUI.addType)" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'" style="width:100%;height:44px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;font-size:24px;cursor:pointer;line-height:1;transition:border-color 0.15s">${acctUI.addType==='bank'?'🏦':acctUI.addType==='ewallet'?'📱':'💵'}</button></div>
           <div><div class="field-label">NAME *</div><input id="acct-name" type="text" placeholder="e.g. BDO Savings" class="field-input"></div>
         </div>
         <div class="grid grid-cols-2 gap-3 mb-5">
           <div><div class="field-label">BALANCE (₱)</div><input id="acct-balance" type="number" step="0.01" min="0" placeholder="0.00" class="field-input"></div>
           <div><div class="field-label">MAINTAINING BAL. (₱)</div><input id="acct-mbalance" type="number" step="0.01" min="0" placeholder="0.00" class="field-input" title="Min balance to keep in account"></div>
         </div>
-        <div id="acct-err" class="text-red-400 text-xs mb-3"></div>
+        <div id="acct-err" class="text-neg text-xs mb-3"></div>
         <div class="flex gap-3">
-          <button onclick="acctSave()" class="flex-1 rounded-xl py-3 font-semibold text-white text-sm" style="background:#6366f1;border:none;cursor:pointer">Add Account</button>
-          <button onclick="acctCloseAdd()" class="flex-1 rounded-xl py-3 text-sm" style="background:#16191f;border:1px solid rgba(255,255,255,0.08);color:#9ca3af;cursor:pointer">Cancel</button>
+          <button onclick="acctSave()" class="flex-1 rounded-xl py-3 font-semibold text-white text-sm" style="background:var(--accent);border:none;cursor:pointer">Add Account</button>
+          <button onclick="acctCloseAdd()" class="flex-1 rounded-xl py-3 text-sm" style="background:var(--surface2);border:1px solid var(--border);color:var(--text-2);cursor:pointer">Cancel</button>
         </div>
       </div>
     </div>` : '';
 
   const addCCModal = acctUI.showAddCC ? `
     <div class="fixed inset-0 flex items-end sm:items-center justify-center" style="z-index:200;background:rgba(0,0,0,0.8)" onclick="ccCloseAdd()">
-      <div class="w-full sm:w-96 rounded-t-3xl sm:rounded-2xl p-6" style="background:#1c2028;border:1px solid rgba(255,255,255,0.08);max-height:92vh;overflow-y:auto" onclick="event.stopPropagation()">
+      <div class="w-full sm:w-96 rounded-t-3xl sm:rounded-2xl p-6" style="background:var(--surface);border:1px solid var(--border);max-height:92vh;overflow-y:auto" onclick="event.stopPropagation()">
         <div class="flex items-center justify-between mb-5">
           <div class="text-lg font-bold">Add Credit Card</div>
-          <button onclick="ccCloseAdd()" style="background:none;border:none;color:#6b7280;cursor:pointer;font-size:22px;line-height:1">×</button>
+          <button onclick="ccCloseAdd()" style="background:none;border:none;color:var(--text-3);cursor:pointer;font-size:22px;line-height:1">×</button>
         </div>
         <div class="grid gap-3 mb-3" style="grid-template-columns:56px 1fr">
           <div><div class="field-label">ICON</div><input type="hidden" id="cc-icon" value="💳">
-          <button type="button" onclick="iconPickerOpen('cc-icon','cc')" id="cc-icon-btn" onmouseover="this.style.borderColor='#6366f1'" onmouseout="this.style.borderColor='rgba(255,255,255,0.08)'" style="width:100%;height:44px;background:#16191f;border:1px solid rgba(255,255,255,0.08);border-radius:10px;font-size:24px;cursor:pointer;line-height:1;transition:border-color 0.15s">💳</button></div>
+          <button type="button" onclick="iconPickerOpen('cc-icon','cc')" id="cc-icon-btn" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'" style="width:100%;height:44px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;font-size:24px;cursor:pointer;line-height:1;transition:border-color 0.15s">💳</button></div>
           <div><div class="field-label">NAME *</div><input id="cc-name" type="text" placeholder="e.g. BPI Credit Card" class="field-input"></div>
         </div>
         <div class="grid grid-cols-2 gap-3 mb-3">
@@ -1272,41 +1272,41 @@ function renderAccounts() {
           <div><div class="field-label">STATEMENT BAL. (₱)</div><input id="cc-last-stmt" type="number" step="0.01" min="0" placeholder="0.00" class="field-input" title="Total Amount Due from your last statement"></div>
           <div><div class="field-label">MIN. AMOUNT DUE (₱)</div><input id="cc-min-due" type="number" step="0.01" min="0" placeholder="0.00" class="field-input"></div>
         </div>
-        <div id="cc-err" class="text-red-400 text-xs mb-3"></div>
+        <div id="cc-err" class="text-neg text-xs mb-3"></div>
         <div class="flex gap-3">
-          <button onclick="ccSave()" class="flex-1 rounded-xl py-3 font-semibold text-white text-sm" style="background:#6366f1;border:none;cursor:pointer">Add Card</button>
-          <button onclick="ccCloseAdd()" class="flex-1 rounded-xl py-3 text-sm" style="background:#16191f;border:1px solid rgba(255,255,255,0.08);color:#9ca3af;cursor:pointer">Cancel</button>
+          <button onclick="ccSave()" class="flex-1 rounded-xl py-3 font-semibold text-white text-sm" style="background:var(--accent);border:none;cursor:pointer">Add Card</button>
+          <button onclick="ccCloseAdd()" class="flex-1 rounded-xl py-3 text-sm" style="background:var(--surface2);border:1px solid var(--border);color:var(--text-2);cursor:pointer">Cancel</button>
         </div>
       </div>
     </div>` : '';
 
   return `${renderNav()}
     <div class="text-2xl font-bold mb-5">Accounts</div>
-    <div class="rounded-2xl p-5 mb-6" style="background:linear-gradient(135deg,#1e3461 0%,#312e81 100%);border:1px solid rgba(99,102,241,0.3)">
-      <div class="text-xs mb-1" style="color:rgba(255,255,255,0.55)">Net Worth</div>
+    <div class="rounded-2xl p-5 mb-6" style="background:var(--hero-gradient);border:1px solid var(--accent-border)">
+      <div class="text-xs mb-1" style="color:rgba(28,25,23,0.6)">Net Worth</div>
       <div class="text-4xl font-bold mb-4">${fmt2(nw)}</div>
       <div class="grid grid-cols-2 gap-4">
-        <div><div class="text-xs mb-1" style="color:rgba(255,255,255,0.5)">Total Assets</div><div class="text-lg font-semibold text-emerald-400">${fmt2(totalDebit)}</div></div>
-        <div><div class="text-xs mb-1" style="color:rgba(255,255,255,0.5)">Total Owed</div><div class="text-lg font-semibold text-red-400">${fmt2(totalOwed)}</div></div>
+        <div><div class="text-xs mb-1" style="color:rgba(28,25,23,0.6)">Total Assets</div><div class="text-lg font-semibold">${fmt2(totalDebit)}</div></div>
+        <div><div class="text-xs mb-1" style="color:rgba(28,25,23,0.6)">Total Owed</div><div class="text-lg font-semibold">${fmt2(totalOwed)}</div></div>
       </div>
-      ${totalMaintaining>0?`<div style="margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.1);display:flex;justify-content:space-between;align-items:center"><div style="font-size:11px;color:rgba(255,255,255,0.45)">Spendable (excl. maintaining bal.)</div><div style="font-size:14px;font-weight:600;color:#fbbf24">${fmt2(totalSpendable)}</div></div>`:''}
+      ${totalMaintaining>0?`<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center"><div style="font-size:11px;color:rgba(28,25,23,0.6)">Spendable (excl. maintaining bal.)</div><div style="font-size:14px;font-weight:700;color:var(--on-accent)">${fmt2(totalSpendable)}</div></div>`:''}
     </div>
     ${section('Banks', banks, 'bank', sumB)}
     ${section('E-Wallets', ewallets, 'ewallet', sumE)}
     ${section('Cash', cashList, 'cash', sumC)}
-    <div class="rounded-2xl p-4 mb-4" style="background:#1c2028">
+    <div class="rounded-2xl p-4 mb-4" style="background:var(--surface)">
       <div class="flex items-center justify-between mb-3">
         <div class="flex items-center gap-2">
           <span>💳</span><span class="font-semibold">Credit Cards</span>
-          <span class="text-xs px-2 py-0.5 rounded-full font-medium" style="background:rgba(245,158,11,0.12);color:#f59e0b">${state.creditCards.length}</span>
+          <span class="text-xs px-2 py-0.5 rounded-full font-medium" style="background:var(--amber-dim);color:var(--amber)">${state.creditCards.length}</span>
         </div>
         <div class="flex items-center gap-3">
-          <span class="text-sm font-semibold text-red-400">Owed ${fmt2(totalOwed)}</span>
-          <button onclick="ccOpenAdd()" class="text-xs px-3 py-1.5 rounded-lg font-semibold text-white" style="background:#6366f1;border:none;cursor:pointer">+ Add</button>
+          <span class="text-sm font-semibold text-neg">Owed ${fmt2(totalOwed)}</span>
+          <button onclick="ccOpenAdd()" class="text-xs px-3 py-1.5 rounded-lg font-semibold text-white" style="background:var(--accent);border:none;cursor:pointer">+ Add</button>
         </div>
       </div>
       ${state.creditCards.map(c=>ccCard(c)).join('')}
-      ${state.creditCards.length===0?`<div class="text-center py-4 text-sm" style="color:#6b7280">No credit cards added yet</div>`:''}
+      ${state.creditCards.length===0?`<div class="text-center py-4 text-sm" style="color:var(--text-3)">No credit cards added yet</div>`:''}
     </div>
     ${addAcctModal}${addCCModal}`;
 }
@@ -1334,6 +1334,9 @@ function renderBottomNav() {
 
 
 function render() {
+  // FAB only makes sense inside the app, not on loading/login screens
+  const fab = document.querySelector('.desktop-fab');
+  if (fab) fab.style.display = (!isLoading && currentUser) ? '' : 'none';
   if (isLoading) {
     document.getElementById('app').innerHTML = renderLoadingScreen();
     document.getElementById('bottom-nav').innerHTML = '';
