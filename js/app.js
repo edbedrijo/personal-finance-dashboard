@@ -249,7 +249,7 @@ function renderUserPill() {
   const name = currentUser.user_metadata?.full_name?.split(' ')[0] || currentUser.email?.split('@')[0] || 'Me';
   const avatar = currentUser.user_metadata?.avatar_url;
   return `
-    <div style="position:fixed;top:12px;right:12px;z-index:300;display:flex;align-items:center;gap-8px">
+    <div style="position:fixed;top:12px;right:12px;z-index:150;display:flex;align-items:center;gap-8px">
       <span id="sync-indicator" style="font-size:11px;color:var(--text-3);opacity:0;transition:opacity 0.5s;margin-right:8px"></span>
       <div style="display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--border);border-radius:999px;padding:4px 10px 4px 6px;cursor:pointer" onclick="document.getElementById('user-menu').classList.toggle('hidden')">
         ${avatar ? `<img src="${avatar}" style="width:24px;height:24px;border-radius:50%;object-fit:cover">` : `<div style="width:24px;height:24px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700">${name[0].toUpperCase()}</div>`}

@@ -36,6 +36,9 @@ Classic `<script>` tags loaded in dependency order — **NOT ES modules** (all h
 
 - **`css/styles.css`**: "Marigold" design system — semantic tokens under `:root` (light, default) and `[data-theme="dark"]`. Accent is marigold `#ffb000` with ink text (`--on-accent`); income/expense stay green/red via `--green`/`--red`. **Never hardcode colors in JS templates — always `var(--token)`**, or the light/dark toggle breaks. Signature card look: `--card-border` + offset `box-shadow: 3px 4px 0 var(--card-shadow)` (applied automatically to `.bg-surface` / `background:var(--surface)` elements). Navigation is floating pill docks (top pill on desktop, bottom dock + FAB on mobile). Theme toggle: `toggleTheme()` (user menu), persisted in localStorage `pf_theme`, defaults to system preference.
 - **PH brand badges**: `PH_BRANDS` registry in `config.js` maps account/CC names (substring match) to brand-colored monogram badges via `brandBadge(name, fallbackEmoji)`. Add new banks there.
+- **Insights view** (`renderInsights` + `initInsightsCharts` in render.js, data helpers in utils.js): Chart.js (CDN) charts must be initialized AFTER `innerHTML` is set — `render()` does this via `setTimeout(initInsightsCharts, 0)`; chart instances are tracked in `_insCharts` and destroyed before re-init. Chart colors read CSS tokens via `getComputedStyle` so theme toggles recolor them.
+- **Date-range filtering**: shared `renderRangeModal(target)` + `rangeOpen/rangeSetPreset/rangeApplyCustom` handlers; presets in `RANGE_PRESETS` (utils.js), each consumer (txUI, insUI) keeps its own `range` object. Filter transactions with `inRange(t, range)`.
+- **Z-index layers**: bottom nav 100, user pill 150, modals 200, icon picker 9999. The pill MUST stay below modals or it blocks their close buttons on mobile.
 - New code goes in the file matching its role; new load-order dependencies mean adding the script tag in the right position in `index.html`.
 
 ### Data Layer

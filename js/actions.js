@@ -4,6 +4,22 @@
 window.setView     = v => { currentView=v; render(); window.scrollTo(0,0); };
 window.showImportPanel = () => { const p=document.getElementById('import-panel'); if(p) p.style.display=p.style.display==='none'?'':'none'; };
 window.setForecast = d => { state.forecastDays=d; save(); render(); };
+// ── Shared date-range picker (Transactions + Insights) ──
+let rangeTarget = 'tx';
+const rangeUI = () => rangeTarget === 'ins' ? insUI : txUI;
+window.rangeOpen = t => { rangeTarget = t; rangeUI().showRange = true; render(); };
+window.rangeClose = () => { txUI.showRange = false; insUI.showRange = false; render(); };
+window.rangeSetPreset = p => { const ui = rangeUI(); ui.range = makeRange(p); ui.showRange = false; render(); };
+window.rangeApplyCustom = () => {
+  const s = document.getElementById('range-start')?.value;
+  const e = document.getElementById('range-end')?.value;
+  if (!s || !e) { const err = document.getElementById('range-err'); if (err) err.textContent = 'Pick both dates.'; return; }
+  const ui = rangeUI();
+  ui.range = { preset: 'custom', start: s <= e ? s : e, end: s <= e ? e : s };
+  ui.showRange = false; render();
+};
+window.txSetTypeFilter = f => { txUI.typeFilter = f; render(); };
+window.insSetTrendCat = id => { insUI.trendCatId = id; render(); };
 
 // ═══════════════════════════════════════════════════════
 // CATEGORY ACTIONS
@@ -60,7 +76,6 @@ window.catStartRenameSub = (cid,sid) => {
 // ═══════════════════════════════════════════════════════
 // TRANSACTION ACTIONS
 // ═══════════════════════════════════════════════════════
-window.txSetFilter  = f => { txUI.filter=f; render(); };
 window.txOpenModal  = () => { txUI.showModal=true; txUI.editId=null; txUI.deleteId=null; render(); setTimeout(()=>document.getElementById('tx-desc')?.focus(),60); };
 window.txOpenEdit   = id  => { txUI.editId=id; txUI.showModal=true; txUI.deleteId=null; render(); setTimeout(()=>document.getElementById('tx-desc')?.focus(),60); };
 window.txCloseModal = () => { txUI.showModal=false; txUI.editId=null; render(); };

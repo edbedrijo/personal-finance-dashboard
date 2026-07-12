@@ -60,6 +60,16 @@ const brandBadge = (name, fallback) => {
   return `<span style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;border-radius:inherit;background:${b.color};color:#fff;font-size:${fs}px;font-weight:800;letter-spacing:${ls};line-height:1">${b.abbr}</span>`;
 };
 
+// ── Net-worth privacy toggle (device preference, not synced) ──
+let hideNetWorth = false;
+try { hideNetWorth = localStorage.getItem('pf_hide_nw') === '1'; } catch(e) {}
+window.toggleNetWorth = () => {
+  hideNetWorth = !hideNetWorth;
+  try { localStorage.setItem('pf_hide_nw', hideNetWorth ? '1' : '0'); } catch(e) {}
+  render();
+};
+const maskAmt = v => hideNetWorth ? '₱ ••••••' : v;
+
 const STORAGE_KEY = 'pf_v2';
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const now = new Date();

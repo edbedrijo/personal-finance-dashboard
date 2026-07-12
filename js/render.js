@@ -2,12 +2,12 @@
 // RENDER NAV
 // ═══════════════════════════════════════════════════════
 function renderNav() {
-  const inTxSection = ['transactions','categories','recurring'].includes(currentView);
+  const inTxSection = ['transactions','categories','recurring','insights'].includes(currentView);
   const isActive = v => v==='dashboard' ? currentView==='dashboard' : v==='transactions' ? inTxSection : currentView===v;
   const items = [['dashboard','🏠','Home'],['transactions','💸','Transactions'],['accounts','🏦','Accounts'],['goals','🎯','Goals']];
   const subNav = inTxSection ? `
     <div class="flex border-b mb-5" style="border-color:var(--border2);margin-top:0">
-      ${[['transactions','Transactions'],['categories','Categories'],['recurring','Recurring']].map(([k,lbl])=>`
+      ${[['transactions','Transactions'],['categories','Categories'],['recurring','Recurring'],['insights','📊 Insights']].map(([k,lbl])=>`
         <button onclick="setView('${k}')" style="background:none;border:none;border-bottom:2px solid ${currentView===k?'var(--accent)':'transparent'};cursor:pointer;padding:8px 14px;font-size:13px;font-family:inherit;color:${currentView===k?'var(--text)':'var(--text-3)'};font-weight:${currentView===k?'600':'400'};white-space:nowrap;margin-bottom:-1px">${lbl}</button>`).join('')}
     </div>` : '<div class="mb-7"></div>';
   const firstName = currentUser
@@ -63,10 +63,8 @@ function renderTransactions() {
   const lastMoYr = mo === 0 ? yr - 1 : yr;
   const lastMo   = mo === 0 ? 11 : mo - 1;
   let list = [...state.transactions].sort((a,b)=>new Date(b.date)-new Date(a.date));
-  if      (txUI.filter==='month')     list = list.filter(t=>{ const d=new Date(t.date+'T00:00:00'); return d.getFullYear()===yr&&d.getMonth()===mo; });
-  else if (txUI.filter==='lastMonth') list = list.filter(t=>{ const d=new Date(t.date+'T00:00:00'); return d.getFullYear()===lastMoYr&&d.getMonth()===lastMo; });
-  else if (txUI.filter==='expense')   list = list.filter(t=>t.type==='expense');
-  else if (txUI.filter==='income')    list = list.filter(t=>t.type==='income');
+  list = list.filter(t => inRange(t, txUI.range));
+  if (txUI.typeFilter !== 'all') list = list.filter(t => t.type === txUI.typeFilter);
 
   const totalIncome   = list.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0);
   const totalExpense  = list.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
@@ -115,8 +113,6 @@ function renderTransactions() {
 
 
 
-  const filterLabels = {month:'This Month', lastMonth:'Last Month', expense:'Expenses', income:'Income', all:'All Time'};
-  const filters = ['month','lastMonth','expense','income','all'];
 
   // Modal: supports Add and Edit mode
   const activeCatOptions = (type, selId='') => state.categories.filter(c=>c.type===type&&c.active)
@@ -249,12 +245,16 @@ function renderTransactions() {
       </div>
     </div>
 
-    <!-- Filter tabs -->
-    <div class="flex gap-2 mb-5 flex-wrap">
-      ${filters.map(f=>`
-        <button onclick="txSetFilter('${f}')" class="text-xs px-3 py-1.5 rounded-full transition-all"
-          style="${txUI.filter===f?'background:var(--accent);color:#fff;border:1px solid var(--accent)':'background:var(--surface);color:var(--text-2);border:1px solid var(--border)'}">
-          ${filterLabels[f]}
+    <!-- Filters: date range + type -->
+    <div class="flex gap-2 mb-5 flex-wrap items-center">
+      <button onclick="rangeOpen('tx')" class="text-xs px-3 py-1.5 rounded-full font-semibold transition-all"
+        style="background:var(--accent);color:var(--on-accent);border:1px solid var(--card-border);cursor:pointer">
+        📅 ${rangeLabel(txUI.range)} ▾
+      </button>
+      ${[['all','All'],['expense','Expenses'],['income','Income'],['transfer','Transfers']].map(([f,lbl])=>`
+        <button onclick="txSetTypeFilter('${f}')" class="text-xs px-3 py-1.5 rounded-full transition-all"
+          style="${txUI.typeFilter===f?'background:var(--surface3);color:var(--text);border:1px solid var(--card-border);font-weight:600':'background:var(--surface);color:var(--text-2);border:1px solid var(--border)'};cursor:pointer">
+          ${lbl}
         </button>`).join('')}
     </div>
 
@@ -268,7 +268,8 @@ function renderTransactions() {
           </div>`
         : rowsHTML}
     </div>
-    ${modal}`;
+    ${modal}
+    ${txUI.showRange ? renderRangeModal('tx') : ''}`;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -447,12 +448,16 @@ function renderDashboard() {
 
   return `${renderNav()}
     <div class="rounded-2xl p-6 mb-6" style="background:var(--hero-gradient)">
-      <div class="text-sm opacity-75 mb-1">Net worth</div>
-      <div class="text-5xl font-bold tracking-tight mb-5">${fmt2(nw)}</div>
-      <div class="flex gap-10">
-        <div><div class="text-xs opacity-60 mb-0.5">Assets</div><div class="text-lg font-semibold">${fmt2(assets)}</div></div>
-        <div><div class="text-xs opacity-60 mb-0.5">Liabilities</div><div class="text-lg font-semibold">${fmt2(liab)}</div></div>
+      <div class="flex items-center justify-between mb-1">
+        <div class="text-sm font-medium" style="color:rgba(28,25,23,0.85)">Net worth</div>
+        <button onclick="toggleNetWorth()" title="${hideNetWorth?'Show amounts':'Hide amounts'}" style="background:rgba(28,25,23,0.1);border:1px solid rgba(28,25,23,0.3);border-radius:10px;padding:4px 10px;cursor:pointer;font-size:14px;line-height:1">${hideNetWorth?'🙈':'👁️'}</button>
       </div>
+      <div class="text-5xl font-bold tracking-tight mb-5">${maskAmt(fmt2(nw))}</div>
+      <div class="flex gap-10">
+        <div><div class="text-xs font-medium mb-0.5" style="color:rgba(28,25,23,0.8)">Assets</div><div class="text-lg font-semibold">${maskAmt(fmt2(assets))}</div></div>
+        <div><div class="text-xs font-medium mb-0.5" style="color:rgba(28,25,23,0.8)">Liabilities</div><div class="text-lg font-semibold">${maskAmt(fmt2(liab))}</div></div>
+      </div>
+      ${spendable!==assets?`<div style="margin-top:14px;padding-top:12px;border-top:1px solid rgba(28,25,23,0.25);display:flex;justify-content:space-between;align-items:center"><div class="text-xs font-medium" style="color:rgba(28,25,23,0.8)">Spendable (excl. maintaining bal.)</div><div class="text-sm font-bold">${maskAmt(fmt2(spendable))}</div></div>`:''}
     </div>
     <div class="flex items-center justify-between mb-3"><div class="section-label">DEBIT ACCOUNTS</div><div class="text-xs text-pos font-medium">${fmt2(assets)}</div></div>
     <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-3">
@@ -1283,13 +1288,16 @@ function renderAccounts() {
   return `${renderNav()}
     <div class="text-2xl font-bold mb-5">Accounts</div>
     <div class="rounded-2xl p-5 mb-6" style="background:var(--hero-gradient);border:1px solid var(--accent-border)">
-      <div class="text-xs mb-1" style="color:rgba(28,25,23,0.6)">Net Worth</div>
-      <div class="text-4xl font-bold mb-4">${fmt2(nw)}</div>
-      <div class="grid grid-cols-2 gap-4">
-        <div><div class="text-xs mb-1" style="color:rgba(28,25,23,0.6)">Total Assets</div><div class="text-lg font-semibold">${fmt2(totalDebit)}</div></div>
-        <div><div class="text-xs mb-1" style="color:rgba(28,25,23,0.6)">Total Owed</div><div class="text-lg font-semibold">${fmt2(totalOwed)}</div></div>
+      <div class="flex items-center justify-between mb-1">
+        <div class="text-xs font-medium" style="color:rgba(28,25,23,0.85)">Net Worth</div>
+        <button onclick="toggleNetWorth()" title="${hideNetWorth?'Show amounts':'Hide amounts'}" style="background:rgba(28,25,23,0.1);border:1px solid rgba(28,25,23,0.3);border-radius:10px;padding:4px 10px;cursor:pointer;font-size:14px;line-height:1">${hideNetWorth?'🙈':'👁️'}</button>
       </div>
-      ${totalMaintaining>0?`<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center"><div style="font-size:11px;color:rgba(28,25,23,0.6)">Spendable (excl. maintaining bal.)</div><div style="font-size:14px;font-weight:700;color:var(--on-accent)">${fmt2(totalSpendable)}</div></div>`:''}
+      <div class="text-4xl font-bold mb-4">${maskAmt(fmt2(nw))}</div>
+      <div class="grid grid-cols-2 gap-4">
+        <div><div class="text-xs font-medium mb-1" style="color:rgba(28,25,23,0.8)">Total Assets</div><div class="text-lg font-semibold">${maskAmt(fmt2(totalDebit))}</div></div>
+        <div><div class="text-xs font-medium mb-1" style="color:rgba(28,25,23,0.8)">Total Owed</div><div class="text-lg font-semibold">${maskAmt(fmt2(totalOwed))}</div></div>
+      </div>
+      ${totalMaintaining>0?`<div style="margin-top:12px;padding-top:12px;border-top:1px solid rgba(28,25,23,0.25);display:flex;justify-content:space-between;align-items:center"><div class="text-xs font-medium" style="color:rgba(28,25,23,0.8)">Spendable (excl. maintaining bal.)</div><div style="font-size:14px;font-weight:700;color:var(--on-accent)">${maskAmt(fmt2(totalSpendable))}</div></div>`:''}
     </div>
     ${section('Banks', banks, 'bank', sumB)}
     ${section('E-Wallets', ewallets, 'ewallet', sumE)}
@@ -1325,13 +1333,218 @@ window.fabOpen = () => {
 // RENDER BOTTOM NAV
 // ═══════════════════════════════════════════════════════
 function renderBottomNav() {
-  const inTxSection = ['transactions','categories','recurring'].includes(currentView);
+  const inTxSection = ['transactions','categories','recurring','insights'].includes(currentView);
   const isActive = v => v==='dashboard' ? currentView==='dashboard' : v==='transactions' ? inTxSection : currentView===v;
   const tab = (k,ic,lbl) => `<button class="bnav-item${isActive(k)?' active':''}" onclick="setView('${k}')"><div class="bnav-pill"></div><span class="bnav-icon">${ic}</span><span class="bnav-label">${lbl}</span></button>`;
   const fab = `<div class="bnav-fab-wrap"><button class="bnav-fab" onclick="fabOpen()" title="Add transaction">+</button></div>`;
   return `<div class="bottom-nav"><div class="bottom-nav-inner">${tab('dashboard','🏠','Home')}${tab('transactions','💸','Txns')}${fab}${tab('accounts','🏦','Accts')}${tab('goals','🎯','Goals')}</div></div>`;
 }
 
+
+// ═══════════════════════════════════════════════════════
+// SHARED DATE-RANGE PICKER (Transactions + Insights)
+// ═══════════════════════════════════════════════════════
+function renderRangeModal(target) {
+  const ui = target === 'ins' ? insUI : txUI;
+  const r = ui.range;
+  return `
+    <div class="modal-overlay fixed inset-0 flex items-end sm:items-center justify-center" style="z-index:200;background:rgba(0,0,0,0.75);backdrop-filter:blur(4px)" onclick="rangeClose()">
+      <div class="w-full sm:w-96 rounded-t-3xl sm:rounded-2xl p-6" style="background:var(--surface);border:1.5px solid var(--card-border);box-shadow:3px 4px 0 var(--card-shadow);max-height:92vh;overflow-y:auto" onclick="event.stopPropagation()">
+        <div class="flex items-center justify-between mb-1">
+          <div class="text-lg font-bold">📅 Date Range</div>
+          <button onclick="rangeClose()" style="background:none;border:none;color:var(--text-3);cursor:pointer;font-size:20px;line-height:1">×</button>
+        </div>
+        <div class="text-sm mb-4" style="color:var(--accent-text);font-weight:600">${rangeLabel(r)}${r.preset!=='all'&&r.preset!=='custom'?` · ${fmtDateShort(r.start)} – ${fmtDate(r.end)}`:''}</div>
+
+        <div class="grid grid-cols-2 gap-2 mb-5">
+          ${RANGE_PRESETS.map(([k,lbl])=>`
+            <button onclick="rangeSetPreset('${k}')" class="text-sm py-2.5 rounded-xl transition-all"
+              style="${r.preset===k?'background:var(--accent);color:var(--on-accent);border:1px solid var(--card-border);font-weight:600':'background:var(--surface2);color:var(--text-2);border:1px solid var(--border)'};cursor:pointer">
+              ${lbl}
+            </button>`).join('')}
+        </div>
+
+        <div class="section-label mb-3">CUSTOM RANGE</div>
+        <div class="grid grid-cols-2 gap-3 mb-3">
+          <div><div class="field-label">FROM</div><input id="range-start" type="date" value="${r.preset==='custom'?r.start:''}" class="field-input"></div>
+          <div><div class="field-label">TO</div><input id="range-end" type="date" value="${r.preset==='custom'?r.end:''}" class="field-input"></div>
+        </div>
+        <div id="range-err" class="text-neg text-xs mb-3"></div>
+        <button onclick="rangeApplyCustom()" class="w-full rounded-xl py-3 font-semibold text-sm" style="background:${r.preset==='custom'?'var(--accent)':'var(--surface2)'};color:${r.preset==='custom'?'var(--on-accent)':'var(--text)'};border:1px solid var(--card-border);cursor:pointer">✓ Apply custom range</button>
+      </div>
+    </div>`;
+}
+
+// ═══════════════════════════════════════════════════════
+// RENDER INSIGHTS
+// ═══════════════════════════════════════════════════════
+const INS_PALETTE = ['#ffb000','#3b82f6','#10b981','#ef4444','#8b5cf6','#ec4899','#06b6d4','#f97316','#84cc16','#64748b'];
+let _insCharts = [];
+
+function renderInsights() {
+  if (!state.transactions.length) return `${renderNav()}
+    <div class="flex flex-col items-center justify-center py-20 text-center">
+      <div class="text-5xl mb-4">📊</div>
+      <div class="text-xl font-bold mb-2">No data to analyze yet</div>
+      <div class="text-sm max-w-xs" style="color:var(--text-3)">Log a few transactions and your income, spending, and category breakdowns will appear here.</div>
+    </div>`;
+
+  const m = insightsMonthly(6);
+  const active = m.filter(x => x.inc > 0 || x.exp > 0);
+  const avgInc = active.length ? active.reduce((s,x)=>s+x.inc,0)/active.length : 0;
+  const avgExp = active.length ? active.reduce((s,x)=>s+x.exp,0)/active.length : 0;
+  const rate   = avgInc > 0 ? Math.round(((avgInc-avgExp)/avgInc)*100) : null;
+  const cats   = insightsCategories(insUI.range);
+  const incs   = insightsCategories(insUI.range, 'income');
+  const trendCatId = insUI.trendCatId || topSpendCategoryId();
+  const trendCat = state.categories.find(c => c.id === trendCatId);
+  const expenseCats = state.categories.filter(c => c.type === 'expense');
+
+  const breakdownRows = b => b.rows.map((r,i) => {
+    const pct = b.total > 0 ? (r.amt/b.total)*100 : 0;
+    return `
+      <div class="flex items-center gap-3 py-2" style="border-bottom:1px solid var(--border2)">
+        <span style="width:10px;height:10px;border-radius:3px;background:${INS_PALETTE[i%INS_PALETTE.length]};flex-shrink:0"></span>
+        <span class="text-sm flex-1 truncate">${r.name}</span>
+        <span class="text-xs" style="color:var(--text-3)">${pct.toFixed(1)}%</span>
+        <span class="text-sm font-semibold" style="min-width:80px;text-align:right">${fmt(r.amt)}</span>
+      </div>`;
+  }).join('');
+  const catRows = breakdownRows(cats);
+  const incRows = breakdownRows(incs);
+
+  return `${renderNav()}
+    <div class="text-2xl font-bold mb-1">Insights</div>
+    <div class="section-label mb-5">Last 6 months · averages use months with activity</div>
+
+    <div class="grid grid-cols-3 gap-3 mb-5">
+      <div class="rounded-xl p-3 text-center" style="background:var(--surface)">
+        <div class="section-label mb-1">AVG INCOME /MO</div>
+        <div class="font-bold text-pos text-sm">${fmt(avgInc)}</div>
+      </div>
+      <div class="rounded-xl p-3 text-center" style="background:var(--surface)">
+        <div class="section-label mb-1">AVG SPEND /MO</div>
+        <div class="font-bold text-neg text-sm">${fmt(avgExp)}</div>
+      </div>
+      <div class="rounded-xl p-3 text-center" style="background:var(--surface)">
+        <div class="section-label mb-1">SAVINGS RATE</div>
+        <div class="font-bold text-sm ${rate===null?'':rate>=20?'text-pos':'text-accent'}">${rate===null?'—':rate+'%'}</div>
+      </div>
+    </div>
+
+    <div class="rounded-2xl p-5 mb-5" style="background:var(--surface)">
+      <div class="font-semibold mb-4">💰 Income vs Expenses</div>
+      <div style="height:240px"><canvas id="chart-months"></canvas></div>
+    </div>
+
+    <div class="rounded-2xl p-5 mb-5" style="background:var(--surface)">
+      <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+        <div class="font-semibold">🏷️ Spending by Category</div>
+        <button onclick="rangeOpen('ins')" class="text-xs px-3 py-1.5 rounded-full font-semibold" style="background:var(--accent);color:var(--on-accent);border:1px solid var(--card-border);cursor:pointer">📅 ${rangeLabel(insUI.range)} ▾</button>
+      </div>
+      <div class="section-label mb-3">${cats.label} · ${fmt(cats.total)} total</div>
+      ${cats.rows.length===0
+        ? `<div class="text-center py-10 text-sm" style="color:var(--text-3)">No expenses recorded for this range.</div>`
+        : `<div class="flex flex-col sm:flex-row gap-5 items-center">
+            <div style="width:200px;height:200px;flex-shrink:0"><canvas id="chart-cats"></canvas></div>
+            <div class="flex-1 w-full min-w-0">${catRows}</div>
+          </div>`}
+    </div>
+
+    <div class="rounded-2xl p-5 mb-5" style="background:var(--surface)">
+      <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+        <div class="font-semibold">📈 Category Trend</div>
+        <select onchange="insSetTrendCat(this.value)" class="field-select" style="width:auto;padding:6px 28px 6px 12px;font-size:12px">
+          ${expenseCats.map(c=>`<option value="${c.id}" ${c.id===trendCatId?'selected':''}>${c.icon} ${c.name}</option>`).join('')}
+        </select>
+      </div>
+      <div class="section-label mb-3">${trendCat?trendCat.icon+' '+trendCat.name:'—'} · monthly spend, last 6 months</div>
+      <div style="height:200px"><canvas id="chart-trend"></canvas></div>
+    </div>
+
+    <div class="rounded-2xl p-5 mb-5" style="background:var(--surface)">
+      <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+        <div class="font-semibold">💼 Income by Source</div>
+        <button onclick="rangeOpen('ins')" class="text-xs px-3 py-1.5 rounded-full font-semibold" style="background:var(--surface2);color:var(--text-2);border:1px solid var(--border);cursor:pointer">📅 ${rangeLabel(insUI.range)} ▾</button>
+      </div>
+      <div class="section-label mb-3">${incs.label} · ${fmt(incs.total)} total</div>
+      ${incs.rows.length===0
+        ? `<div class="text-center py-10 text-sm" style="color:var(--text-3)">No income recorded for this range.</div>`
+        : `<div class="flex flex-col sm:flex-row gap-5 items-center">
+            <div style="width:200px;height:200px;flex-shrink:0"><canvas id="chart-income"></canvas></div>
+            <div class="flex-1 w-full min-w-0">${incRows}</div>
+          </div>`}
+    </div>
+    ${insUI.showRange ? renderRangeModal('ins') : ''}`;
+}
+
+function initInsightsCharts() {
+  _insCharts.forEach(c => c.destroy());
+  _insCharts = [];
+  if (typeof Chart === 'undefined') return;
+  const css = k => getComputedStyle(document.documentElement).getPropertyValue(k).trim();
+
+  const m = insightsMonthly(6);
+  const bar = document.getElementById('chart-months');
+  if (bar) _insCharts.push(new Chart(bar, {
+    type: 'bar',
+    data: {
+      labels: m.map(x => x.label),
+      datasets: [
+        { label: 'Income',   data: m.map(x => x.inc), backgroundColor: css('--green-strong'), borderRadius: 6 },
+        { label: 'Expenses', data: m.map(x => x.exp), backgroundColor: css('--red-strong'),   borderRadius: 6 },
+      ],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { labels: { color: css('--text-2'), boxWidth: 12, boxHeight: 12 } } },
+      scales: {
+        x: { grid: { display: false }, ticks: { color: css('--text-3') } },
+        y: { grid: { color: css('--border2') }, ticks: { color: css('--text-3'), callback: v => '₱' + (v >= 1000 ? (v/1000) + 'k' : v) } },
+      },
+    },
+  }));
+
+  const doughnut = (elId, b) => {
+    const el = document.getElementById(elId);
+    if (el && b.rows.length) _insCharts.push(new Chart(el, {
+      type: 'doughnut',
+      data: {
+        labels: b.rows.map(r => r.name),
+        datasets: [{ data: b.rows.map(r => r.amt), backgroundColor: b.rows.map((_, i) => INS_PALETTE[i % INS_PALETTE.length]), borderWidth: 0 }],
+      },
+      options: { responsive: true, maintainAspectRatio: false, cutout: '62%', plugins: { legend: { display: false } } },
+    }));
+  };
+  doughnut('chart-cats',   insightsCategories(insUI.range));
+  doughnut('chart-income', insightsCategories(insUI.range, 'income'));
+
+  const trendCatId = insUI.trendCatId || topSpendCategoryId();
+  const trend = insightsCategoryTrend(trendCatId, 6);
+  const tr = document.getElementById('chart-trend');
+  if (tr) _insCharts.push(new Chart(tr, {
+    type: 'line',
+    data: {
+      labels: trend.map(x => x.label),
+      datasets: [{
+        data: trend.map(x => x.amt),
+        borderColor: css('--accent'),
+        backgroundColor: css('--accent-dim'),
+        fill: true, tension: 0.35,
+        pointBackgroundColor: css('--accent'),
+        pointRadius: 4, borderWidth: 2.5,
+      }],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { display: false }, ticks: { color: css('--text-3') } },
+        y: { beginAtZero: true, grid: { color: css('--border2') }, ticks: { color: css('--text-3'), callback: v => '₱' + (v >= 1000 ? (v/1000) + 'k' : v) } },
+      },
+    },
+  }));
+}
 
 function render() {
   // FAB only makes sense inside the app, not on loading/login screens
@@ -1355,8 +1568,10 @@ function render() {
   else if (currentView==='accounts')     html=renderAccounts();
   else if (currentView==='goals')        html=renderGoals();
   else if (currentView==='recurring')    html=renderRecurring();
+  else if (currentView==='insights')     html=renderInsights();
   else                                   html=renderDashboard();
   document.getElementById('app').innerHTML = html;
+  if (currentView==='insights') setTimeout(initInsightsCharts, 0);
   document.getElementById('bottom-nav').innerHTML = renderBottomNav();
   // Inject user pill into body (outside #app so it's always visible)
   let pill = document.getElementById('user-pill-root');

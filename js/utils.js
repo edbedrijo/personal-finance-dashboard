@@ -3,10 +3,11 @@
 // ═══════════════════════════════════════════════════════
 let currentView = 'dashboard';
 let catUI  = { tab:'expense', expanded:null, showModal:false };
-let txUI   = { filter:'month', showModal:false, deleteId:null, editId:null };
+let txUI   = { typeFilter:'all', range:makeRange('thisMonth'), showModal:false, showRange:false, deleteId:null, editId:null };
 let acctUI = { showAddAcct:false, addType:'bank', editAcctId:null, deleteAcctId:null, showAddCC:false, editCCId:null, deleteCCId:null, paymentCCId:null };
 let goalUI = { showAddGoal:false, editGoalId:null, deleteGoalId:null, depositGoalId:null, expandedGoalId:null, deleteDepositKey:null };
 let recUI  = { showAddRec:false, editRecId:null, deleteRecId:null };
+let insUI  = { range:makeRange('thisMonth'), showRange:false, trendCatId:'' };
 let iconPickerUI = { targetId:null, anchorRect:null };
 let recAutoPostedCount = 0;
 let recurringChecked   = false;
@@ -119,6 +120,100 @@ function getMonthlyData() {
       return { id:'mc_'+cid, name:cat?.name||'Other', icon:cat?.icon||'❓', amount:Math.round(amt), color:palette[i]||'var(--text-3)' };
     });
   return { ...fallbackMonthly, label: currentMonthLabel, income, expenses, categories: topCats.length ? topCats : fallbackMonthly.categories };
+}
+
+// ── Date-range presets (shared by Transactions + Insights filters) ──
+const RANGE_PRESETS = [
+  ['thisWeek','This week'], ['lastWeek','Last week'],
+  ['last7','Last 7 days'],  ['last30','Last 30 days'],
+  ['thisMonth','This month'], ['lastMonth','Last month'],
+  ['thisYear','This year'], ['all','All time'],
+];
+function rangeFromPreset(p) {
+  const t = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const dow = t.getDay(); // 0 = Sunday (week starts Sunday, PH convention)
+  const d = (base, offset) => { const x = new Date(base); x.setDate(base.getDate() + offset); return x; };
+  switch (p) {
+    case 'thisWeek':  return { start: toLocalISO(d(t, -dow)), end: toLocalISO(t) };
+    case 'lastWeek': { const s = d(t, -dow - 7); return { start: toLocalISO(s), end: toLocalISO(d(s, 6)) }; }
+    case 'last7':     return { start: toLocalISO(d(t, -6)),  end: toLocalISO(t) };
+    case 'last30':    return { start: toLocalISO(d(t, -29)), end: toLocalISO(t) };
+    case 'thisMonth': return { start: toLocalISO(new Date(t.getFullYear(), t.getMonth(), 1)),     end: toLocalISO(new Date(t.getFullYear(), t.getMonth() + 1, 0)) };
+    case 'lastMonth': return { start: toLocalISO(new Date(t.getFullYear(), t.getMonth() - 1, 1)), end: toLocalISO(new Date(t.getFullYear(), t.getMonth(), 0)) };
+    case 'thisYear':  return { start: toLocalISO(new Date(t.getFullYear(), 0, 1)),  end: toLocalISO(new Date(t.getFullYear(), 11, 31)) };
+    case 'lastYear':  return { start: toLocalISO(new Date(t.getFullYear() - 1, 0, 1)), end: toLocalISO(new Date(t.getFullYear() - 1, 11, 31)) };
+    default:          return { start: '0000-01-01', end: '9999-12-31' }; // all time
+  }
+}
+function makeRange(preset) { return { preset, ...rangeFromPreset(preset) }; }
+function rangeLabel(r) {
+  if (r.preset === 'custom') return fmtDateShort(r.start) + ' – ' + fmtDate(r.end);
+  return (RANGE_PRESETS.find(x => x[0] === r.preset) || ['','Custom'])[1];
+}
+function inRange(t, r) { return r.preset === 'all' || (t.date >= r.start && t.date <= r.end); }
+
+// ── Insights data ──
+// Income/expense totals per month for the last n months (transfers excluded
+// by type, so CC payments never count as spending)
+function insightsMonthly(n = 6) {
+  const out = [];
+  for (let i = n - 1; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const yr = d.getFullYear(), mo = d.getMonth();
+    let inc = 0, exp = 0;
+    (state.transactions || []).forEach(t => {
+      const td = new Date(t.date + 'T00:00:00');
+      if (td.getFullYear() !== yr || td.getMonth() !== mo) return;
+      if (t.type === 'income') inc += t.amount;
+      else if (t.type === 'expense') exp += t.amount;
+    });
+    out.push({ label: MONTHS[mo].slice(0,3) + (mo === 0 || i === n-1 ? ' ' + String(yr).slice(2) : ''), inc, exp });
+  }
+  return out;
+}
+
+// Category breakdown for a date range — expenses ("where it goes")
+// or income ("where it comes from")
+function insightsCategories(range, type = 'expense') {
+  const map = {};
+  let total = 0;
+  (state.transactions || []).forEach(t => {
+    if (t.type !== type || !inRange(t, range)) return;
+    const key = t.categoryId || '_none';
+    map[key] = (map[key] || 0) + t.amount;
+    total += t.amount;
+  });
+  const rows = Object.entries(map).map(([cid, amt]) => {
+    const c = state.categories.find(x => x.id === cid);
+    return { name: c ? `${c.icon} ${c.name}` : '❓ Uncategorized', amt };
+  }).sort((a, b) => b.amt - a.amt);
+  return { rows, total, label: rangeLabel(range) };
+}
+
+// Monthly spend for one expense category over the last n months
+function insightsCategoryTrend(catId, n = 6) {
+  const out = [];
+  for (let i = n - 1; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const yr = d.getFullYear(), mo = d.getMonth();
+    let sum = 0;
+    (state.transactions || []).forEach(t => {
+      if (t.type !== 'expense' || t.categoryId !== catId) return;
+      const td = new Date(t.date + 'T00:00:00');
+      if (td.getFullYear() === yr && td.getMonth() === mo) sum += t.amount;
+    });
+    out.push({ label: MONTHS[mo].slice(0,3), amt: sum });
+  }
+  return out;
+}
+
+// Expense category with the highest all-time spend — default for the trend chart
+function topSpendCategoryId() {
+  const map = {};
+  (state.transactions || []).forEach(t => {
+    if (t.type === 'expense' && t.categoryId) map[t.categoryId] = (map[t.categoryId] || 0) + t.amount;
+  });
+  return Object.entries(map).sort((a, b) => b[1] - a[1])[0]?.[0] || '';
 }
 
 function editable(value, path, formatter) {
