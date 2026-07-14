@@ -84,8 +84,12 @@ window.txSetType    = t   => {
   const colors = {income:'var(--green)', expense:'var(--red)', transfer:'var(--accent-text)'};
   ['expense','income','transfer'].forEach(k => {
     const btn = document.getElementById('btn-'+k); if (!btn) return;
-    if (k===t) { btn.style.background='var(--surface)'; btn.style.borderColor='var(--border)'; btn.style.color=colors[k]; }
-    else       { btn.style.background='transparent'; btn.style.borderColor='transparent'; btn.style.color='var(--text-3)'; }
+    // Rewrite the full style attribute: styles.css applies the card shadow via
+    // [style*="background:var(--surface)"] (no space), and btn.style.background
+    // re-serializes it with a space, so the selector stops matching.
+    btn.setAttribute('style', k===t
+      ? `background:var(--surface);border:1px solid var(--border);color:${colors[k]}`
+      : 'background:transparent;border:1px solid transparent;color:var(--text-3)');
   });
   const isTransfer = t==='transfer';
   const catWrap   = document.getElementById('tx-cat-wrap');

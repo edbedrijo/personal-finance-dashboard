@@ -6,9 +6,11 @@ function renderNav() {
   const isActive = v => v==='dashboard' ? currentView==='dashboard' : v==='transactions' ? inTxSection : currentView===v;
   const items = [['dashboard','🏠','Home'],['transactions','💸','Transactions'],['accounts','🏦','Accounts'],['goals','🎯','Goals']];
   const subNav = inTxSection ? `
-    <div class="flex border-b mb-5" style="border-color:var(--border2);margin-top:0">
-      ${[['transactions','Transactions'],['categories','Categories'],['recurring','Recurring'],['insights','📊 Insights']].map(([k,lbl])=>`
-        <button onclick="setView('${k}')" style="background:none;border:none;border-bottom:2px solid ${currentView===k?'var(--accent)':'transparent'};cursor:pointer;padding:8px 14px;font-size:13px;font-family:inherit;color:${currentView===k?'var(--text)':'var(--text-3)'};font-weight:${currentView===k?'600':'400'};white-space:nowrap;margin-bottom:-1px">${lbl}</button>`).join('')}
+    <div class="nav-scroll mb-5" style="margin-top:0">
+      <nav class="subnav-pill">
+        ${[['transactions','Transactions'],['categories','Categories'],['recurring','Recurring'],['insights','📊 Insights']].map(([k,lbl])=>`
+        <span class="nav-item ${currentView===k?'active':''}" onclick="setView('${k}')">${lbl}</span>`).join('')}
+      </nav>
     </div>` : '<div class="mb-7"></div>';
   const firstName = currentUser
     ? ((currentUser.user_metadata?.full_name?.split(' ')[0] || currentUser.email?.split('@')[0] || 'there').replace(/^./, c => c.toUpperCase()))
