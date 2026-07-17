@@ -5,7 +5,8 @@ let currentView = 'dashboard';
 let catUI  = { tab:'expense', expanded:null, showModal:false };
 let txUI   = { typeFilter:'all', range:makeRange('thisMonth'), showModal:false, showRange:false, deleteId:null, editId:null };
 let acctUI = { showAddAcct:false, addType:'bank', editAcctId:null, deleteAcctId:null, showAddCC:false, editCCId:null, deleteCCId:null, paymentCCId:null };
-let goalUI = { showAddGoal:false, editGoalId:null, deleteGoalId:null, depositGoalId:null, expandedGoalId:null, deleteDepositKey:null };
+let goalUI = { tab:'goals', showAddGoal:false, editGoalId:null, deleteGoalId:null, depositGoalId:null, expandedGoalId:null, deleteDepositKey:null,
+               showAddLoan:false, editLoanId:null, deleteLoanId:null, paymentLoanId:null, expandedLoanId:null, deleteLoanPaymentKey:null };
 let recUI  = { showAddRec:false, editRecId:null, deleteRecId:null };
 let insUI  = { range:makeRange('thisMonth'), showRange:false, trendCatId:'' };
 let iconPickerUI = { targetId:null, anchorRect:null };
@@ -85,14 +86,29 @@ function checkAndPostRecurring() {
 }
 
 function computeGoalSaved(g) {
-  const manual = (g.deposits||[]).reduce((s,d)=>s+d.amount,0);
-  let auto = 0;
-  if (g.linkedCategoryId) {
-    auto = state.transactions
-      .filter(t=>t.categoryId===g.linkedCategoryId && (!g.linkedSubcategoryId||t.subcategoryId===g.linkedSubcategoryId))
-      .reduce((s,t)=>s+t.amount,0);
-  }
-  return { manual, auto, total:manual+auto };
+  const total = (g.deposits||[]).reduce((s,d)=>s+d.amount,0);
+  return { total };
+}
+
+// ── Loan math — PH add-on/factor-rate style ──
+// Interest each month = monthlyRate% of the ORIGINAL principal (flat), so the
+// default payment is principal/term + that flat interest. The bank's "effective
+// interest rate p.a." (EIR) is higher than monthlyRate×12 because you keep
+// paying interest on the full principal even as the balance shrinks.
+function loanTotals(l) {
+  const monthlyInterest = l.principal * (l.monthlyRate||0) / 100;
+  const defaultPayment  = (l.termMonths>0 ? l.principal/l.termMonths : 0) + monthlyInterest;
+  const monthlyPayment  = l.monthlyPayment || defaultPayment;
+  const totalPayable    = monthlyPayment * (l.termMonths||0);
+  const totalInterest   = Math.max(totalPayable - l.principal, 0);
+  const paid            = (l.payments||[]).reduce((s,p)=>s+p.amount,0);
+  const remaining       = Math.max(totalPayable - paid, 0);
+  // Epsilon guards float noise (e.g. 35.0000003 must not round up to 36)
+  const paymentsLeft    = monthlyPayment>0 ? Math.min(l.termMonths||0, Math.ceil(remaining/monthlyPayment - 1e-7)) : 0;
+  const pctPaid         = totalPayable>0 ? Math.min((paid/totalPayable)*100,100) : 0;
+  return { monthlyInterest, defaultPayment, monthlyPayment, totalPayable, totalInterest,
+           interestPct: l.principal>0 ? (totalInterest/l.principal)*100 : 0,
+           paid, remaining, paymentsLeft, pctPaid };
 }
 
 // ── Dashboard data: auto-calculate from transactions if available ──

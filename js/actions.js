@@ -77,7 +77,16 @@ window.catStartRenameSub = (cid,sid) => {
 // TRANSACTION ACTIONS
 // ═══════════════════════════════════════════════════════
 window.txOpenModal  = () => { txUI.showModal=true; txUI.editId=null; txUI.deleteId=null; render(); setTimeout(()=>document.getElementById('tx-desc')?.focus(),60); };
-window.txOpenEdit   = id  => { txUI.editId=id; txUI.showModal=true; txUI.deleteId=null; render(); setTimeout(()=>document.getElementById('tx-desc')?.focus(),60); };
+window.txOpenEdit   = id  => {
+  const tx = state.transactions.find(t=>t.id===id);
+  // Goal deposits / loan payments mirror records on the goal/loan — editing them
+  // here would desync both sides. Manage them from their card instead.
+  if (tx && (tx.notes==='Goal deposit'||tx.notes==='Loan payment')) {
+    showToast(`Edit this from the Goals ${tx.notes==='Goal deposit'?'goal':'loan'} card (delete + re-add)`, 'error');
+    return;
+  }
+  txUI.editId=id; txUI.showModal=true; txUI.deleteId=null; render(); setTimeout(()=>document.getElementById('tx-desc')?.focus(),60);
+};
 window.txCloseModal = () => { txUI.showModal=false; txUI.editId=null; render(); };
 window.txSetType    = t   => {
   const inp = document.getElementById('tx-type'); if (inp) inp.value = t;
@@ -229,6 +238,18 @@ window.txConfirmDelete = () => {
   const tx = state.transactions.find(t=>t.id===txUI.deleteId);
   if (tx) {
     if (tx.notes==='CC payment') adjustCCPayment(tx, -1);
+    else if (tx.notes==='Goal deposit'||tx.notes==='Loan payment') {
+      // Restore the source account and remove the mirrored deposit/payment record
+      const src = state.accounts.find(a=>a.id===tx.accountId);
+      if (src) src.balance += tx.amount;
+      if (tx.notes==='Goal deposit') {
+        const g = state.goals.find(x=>x.id===tx.goalId);
+        if (g) g.deposits = (g.deposits||[]).filter(d=>d.txId!==tx.id);
+      } else {
+        const l = state.loans.find(x=>x.id===tx.loanId);
+        if (l) l.payments = (l.payments||[]).filter(p=>p.txId!==tx.id);
+      }
+    }
     else {
       adjustAccount(tx.accountId, tx.type, tx.amount, -1);
       if (tx.type==='transfer') adjustTransferDest(tx.toAccountId, tx.amount, -1);
@@ -407,22 +428,21 @@ window.goalConfirmDelete=() => { state.goals=state.goals.filter(g=>g.id!==goalUI
 window.goalToggleHistory=id => { goalUI.expandedGoalId=goalUI.expandedGoalId===id?null:id; goalUI.depositGoalId=null; render(); };
 window.goalOpenDeposit= id => { goalUI.depositGoalId=id; goalUI.expandedGoalId=null; render(); setTimeout(()=>document.getElementById('dep-amt-'+id)?.focus(),60); };
 window.goalCloseDeposit=() => { goalUI.depositGoalId=null; render(); };
-window.goalUpdateSub  = (catSel, subSel) => {
-  const catId=document.getElementById(catSel)?.value;
-  const el=document.getElementById(subSel); if(!el) return;
-  el.innerHTML='<option value="">— All subcategories —</option>';
-  const cat=state.categories.find(c=>c.id===catId);
-  if(cat) cat.subs.filter(s=>s.active).forEach(s=>{ el.innerHTML+=`<option value="${s.id}">${s.name}</option>`; });
+window.goalSetTab = t => { goalUI.tab=t; render(); };
+window.goalAddFromHome = () => { currentView='goals'; goalUI.tab='goals'; goalOpenAdd(); window.scrollTo(0,0); };
+window.goalApplyPreset = (name, icon) => {
+  const n=document.getElementById('goal-name'); if(n) n.value=name;
+  const i=document.getElementById('goal-icon'); if(i) i.value=icon;
+  const b=document.getElementById('goal-icon-btn'); if(b) b.textContent=icon;
+  n?.focus();
 };
 window.goalSave = () => {
   const name=document.getElementById('goal-name')?.value.trim();
   const target=parseFloat(document.getElementById('goal-target')?.value);
   const date=document.getElementById('goal-date')?.value;
   const icon=document.getElementById('goal-icon')?.value.trim()||'🎯';
-  const catId=document.getElementById('goal-cat')?.value||'';
-  const subId=document.getElementById('goal-subcat')?.value||'';
   if(!name||isNaN(target)||!date){document.getElementById('goal-err').textContent='Name, amount, and date are required.';return;}
-  state.goals.push({id:'g_'+Date.now(),name,icon,target,targetDate:date,linkedCategoryId:catId,linkedSubcategoryId:subId,deposits:[]});
+  state.goals.push({id:'g_'+Date.now(),name,icon,target,targetDate:date,deposits:[]});
   save(); goalUI.showAddGoal=false; render();
 };
 window.goalUpdate = id => {
@@ -432,8 +452,6 @@ window.goalUpdate = id => {
   const date=document.getElementById('edit-goal-date')?.value;
   const icon=document.getElementById('edit-goal-icon')?.value.trim();
   if(name) g.name=name; if(!isNaN(target)) g.target=target; if(date) g.targetDate=date; if(icon) g.icon=icon;
-  g.linkedCategoryId=document.getElementById('edit-goal-cat')?.value||'';
-  g.linkedSubcategoryId=document.getElementById('edit-goal-subcat')?.value||'';
   save(); goalUI.editGoalId=null; render();
 };
 window.goalAddDeposit = id => {
@@ -441,9 +459,20 @@ window.goalAddDeposit = id => {
   const amt=parseFloat(document.getElementById('dep-amt-'+id)?.value);
   const date=document.getElementById('dep-date-'+id)?.value||todayISO;
   const note=document.getElementById('dep-note-'+id)?.value.trim()||'';
+  const fromId=document.getElementById('dep-acct-'+id)?.value||'';
   if(isNaN(amt)||amt<=0) return;
   if(!g.deposits) g.deposits=[];
-  g.deposits.push({id:'d_'+Date.now(),date,amount:amt,note});
+  const dep={id:'d_'+Date.now(),date,amount:amt,note};
+  if(fromId){
+    // Real money moves: deduct source account and log a transfer (never an expense)
+    const txId='tx_'+Date.now();
+    state.transactions.push({ id:txId, date, description:`${g.name} deposit`, type:'transfer',
+      amount:amt, categoryId:'', subcategoryId:'', accountId:fromId, toAccountId:'', notes:'Goal deposit', goalId:g.id });
+    const src=state.accounts.find(a=>a.id===fromId);
+    if(src) src.balance -= amt;
+    dep.accountId=fromId; dep.txId=txId;
+  }
+  g.deposits.push(dep);
   save(); goalUI.depositGoalId=null; goalUI.expandedGoalId=id; render();
 };
 window.goalAskDeleteDeposit=(goalId,depositId)=>{ goalUI.deleteDepositKey={goalId,depositId}; render(); };
@@ -451,8 +480,107 @@ window.goalCancelDeleteDeposit=()=>{ goalUI.deleteDepositKey=null; render(); };
 window.goalConfirmDeleteDeposit=()=>{
   const {goalId,depositId}=goalUI.deleteDepositKey;
   const g=state.goals.find(x=>x.id===goalId); if(!g) return;
+  const dep=g.deposits.find(d=>d.id===depositId);
+  if(dep?.accountId){
+    const src=state.accounts.find(a=>a.id===dep.accountId);
+    if(src) src.balance += dep.amount;
+    if(dep.txId) state.transactions=state.transactions.filter(t=>t.id!==dep.txId);
+  }
   g.deposits=g.deposits.filter(d=>d.id!==depositId);
   save(); goalUI.deleteDepositKey=null; render();
+};
+
+// ═══════════════════════════════════════════════════════
+// LOAN ACTIONS
+// ═══════════════════════════════════════════════════════
+window.loanOpenAdd    = () => { goalUI.showAddLoan=true; goalUI.editLoanId=null; render(); setTimeout(()=>document.getElementById('loan-name')?.focus(),60); };
+window.loanCloseAdd   = () => { goalUI.showAddLoan=false; render(); };
+window.loanOpenEdit   = id => { goalUI.editLoanId=id; goalUI.showAddLoan=false; goalUI.deleteLoanId=null; render(); };
+window.loanCancelEdit = () => { goalUI.editLoanId=null; render(); };
+window.loanAskDelete  = id => { goalUI.deleteLoanId=id; goalUI.editLoanId=null; goalUI.paymentLoanId=null; render(); };
+window.loanCancelDelete=() => { goalUI.deleteLoanId=null; render(); };
+window.loanConfirmDelete=() => { state.loans=state.loans.filter(l=>l.id!==goalUI.deleteLoanId); save(); goalUI.deleteLoanId=null; render(); };
+window.loanToggleHistory=id => { goalUI.expandedLoanId=goalUI.expandedLoanId===id?null:id; goalUI.paymentLoanId=null; render(); };
+window.loanOpenPayment= id => { goalUI.paymentLoanId=id; goalUI.expandedLoanId=null; render(); setTimeout(()=>document.getElementById('pay-amt-'+id)?.focus(),60); };
+window.loanClosePayment=() => { goalUI.paymentLoanId=null; render(); };
+// Live-recompute the suggested monthly payment while typing in the loan modal
+window.loanRecalc = (pfx='') => {
+  const principal=parseFloat(document.getElementById(pfx+'loan-principal')?.value)||0;
+  const term=parseInt(document.getElementById(pfx+'loan-term')?.value)||0;
+  const rate=parseFloat(document.getElementById(pfx+'loan-rate')?.value)||0;
+  const t=loanTotals({principal, termMonths:term, monthlyRate:rate, payments:[]});
+  const payInp=document.getElementById(pfx+'loan-payment');
+  if(payInp && !payInp.dataset.touched) payInp.value=t.defaultPayment>0?t.defaultPayment.toFixed(2):'';
+  const sum=document.getElementById(pfx+'loan-summary');
+  if(sum) sum.textContent = principal>0&&term>0
+    ? `Total payable ${fmt(t.totalPayable)} · Total interest ${fmt(t.totalInterest)} (${t.interestPct.toFixed(1)}% of principal)`
+    : '';
+};
+window.loanSave = () => {
+  const name=document.getElementById('loan-name')?.value.trim();
+  const icon=document.getElementById('loan-icon')?.value.trim()||'🏦';
+  const principal=parseFloat(document.getElementById('loan-principal')?.value);
+  const term=parseInt(document.getElementById('loan-term')?.value);
+  const rate=parseFloat(document.getElementById('loan-rate')?.value)||0;
+  const eir=parseFloat(document.getElementById('loan-eir')?.value)||0;
+  const startDate=document.getElementById('loan-start')?.value||todayISO;
+  let payment=parseFloat(document.getElementById('loan-payment')?.value);
+  if(!name||isNaN(principal)||principal<=0||isNaN(term)||term<=0){document.getElementById('loan-err').textContent='Name, principal, and term are required.';return;}
+  if(isNaN(payment)||payment<=0) payment=loanTotals({principal,termMonths:term,monthlyRate:rate,payments:[]}).defaultPayment;
+  state.loans.push({id:'loan_'+Date.now(),name,icon,principal,termMonths:term,monthlyRate:rate,annualEIR:eir,startDate,monthlyPayment:payment,payments:[]});
+  save(); goalUI.showAddLoan=false; render();
+};
+window.loanUpdate = id => {
+  const l=state.loans.find(x=>x.id===id); if(!l) return;
+  const name=document.getElementById('edit-loan-name')?.value.trim();
+  const icon=document.getElementById('edit-loan-icon')?.value.trim();
+  const principal=parseFloat(document.getElementById('edit-loan-principal')?.value);
+  const term=parseInt(document.getElementById('edit-loan-term')?.value);
+  const rate=parseFloat(document.getElementById('edit-loan-rate')?.value);
+  const eir=parseFloat(document.getElementById('edit-loan-eir')?.value);
+  const startDate=document.getElementById('edit-loan-start')?.value;
+  const payment=parseFloat(document.getElementById('edit-loan-payment')?.value);
+  if(name) l.name=name; if(icon) l.icon=icon;
+  if(!isNaN(principal)&&principal>0) l.principal=principal;
+  if(!isNaN(term)&&term>0) l.termMonths=term;
+  if(!isNaN(rate)) l.monthlyRate=rate;
+  if(!isNaN(eir)) l.annualEIR=eir;
+  if(startDate) l.startDate=startDate;
+  if(!isNaN(payment)&&payment>0) l.monthlyPayment=payment;
+  save(); goalUI.editLoanId=null; render();
+};
+window.loanAddPayment = id => {
+  const l=state.loans.find(x=>x.id===id); if(!l) return;
+  const amt=parseFloat(document.getElementById('pay-amt-'+id)?.value);
+  const date=document.getElementById('pay-date-'+id)?.value||todayISO;
+  const note=document.getElementById('pay-note-'+id)?.value.trim()||'';
+  const fromId=document.getElementById('pay-acct-'+id)?.value||'';
+  if(isNaN(amt)||amt<=0) return;
+  const pay={id:'lp_'+Date.now(),date,amount:amt,note};
+  if(fromId){
+    const txId='tx_'+Date.now();
+    state.transactions.push({ id:txId, date, description:`${l.name} payment`, type:'transfer',
+      amount:amt, categoryId:'', subcategoryId:'', accountId:fromId, toAccountId:'', notes:'Loan payment', loanId:l.id });
+    const src=state.accounts.find(a=>a.id===fromId);
+    if(src) src.balance -= amt;
+    pay.accountId=fromId; pay.txId=txId;
+  }
+  l.payments.push(pay);
+  save(); goalUI.paymentLoanId=null; goalUI.expandedLoanId=id; render();
+};
+window.loanAskDeletePayment=(loanId,paymentId)=>{ goalUI.deleteLoanPaymentKey={loanId,paymentId}; render(); };
+window.loanCancelDeletePayment=()=>{ goalUI.deleteLoanPaymentKey=null; render(); };
+window.loanConfirmDeletePayment=()=>{
+  const {loanId,paymentId}=goalUI.deleteLoanPaymentKey;
+  const l=state.loans.find(x=>x.id===loanId); if(!l) return;
+  const pay=l.payments.find(p=>p.id===paymentId);
+  if(pay?.accountId){
+    const src=state.accounts.find(a=>a.id===pay.accountId);
+    if(src) src.balance += pay.amount;
+    if(pay.txId) state.transactions=state.transactions.filter(t=>t.id!==pay.txId);
+  }
+  l.payments=l.payments.filter(p=>p.id!==paymentId);
+  save(); goalUI.deleteLoanPaymentKey=null; render();
 };
 
 // ═══════════════════════════════════════════════════════
@@ -480,6 +608,7 @@ const ICON_SETS = {
   cc:      ['💳','🔴','🔵','🟡','⬛','🟦','🏦','💜','🟠','💎'],
   rec:     ['🔁','📅','🏠','🚗','💡','📱','🛡️','🐱','🍔','✈️','💼','🎯','🏋️','💈','🌊','🎵','📦','🔒','🌱','⚽'],
   goal:    ['🎯','🏠','🚗','✈️','💍','🎓','🏋️','💻','🌴','🎸','🏖️','👶','🐕','📸','🎨','🍀','🚀','⭐','🏆','💫'],
+  loan:    ['🏦','💳','🚗','🏠','🏍️','📱','💻','🎓','🏥','💼','📄','🪙','⚖️','🔑','🛠️'],
   general: ['😊','🌟','❤️','🔥','⚡','🎉','🌈','🦋','🌸','🍀','🎵','🎮','📚','🍕','☕','🌙','☀️','🐱','🐶','🦊'],
 };
 window.iconPickerOpen = (inputId, setKey='general') => {

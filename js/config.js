@@ -70,6 +70,19 @@ window.toggleNetWorth = () => {
 };
 const maskAmt = v => hideNetWorth ? '₱ ••••••' : v;
 
+// ── Goal preset chips — quick-pick common savings goals (New Goal modal) ──
+const GOAL_PRESETS = [
+  { name:'Emergency Fund',    icon:'🛟' },
+  { name:'House Downpayment', icon:'🏠' },
+  { name:'Car Downpayment',   icon:'🚗' },
+  { name:'Travel',            icon:'✈️' },
+  { name:'Wedding',           icon:'💍' },
+  { name:'Education',         icon:'🎓' },
+  { name:'Gadget',            icon:'📱' },
+  { name:'Business Capital',  icon:'💼' },
+  { name:'Retirement',        icon:'🌴' },
+];
+
 const STORAGE_KEY = 'pf_v2';
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const now = new Date();
@@ -116,6 +129,7 @@ const defaultState = {
   creditCards:  [],
   recurring:    [],
   goals:        [],
+  loans:        [],
   forecastDays: 7,
   categories:   defaultCategories,
   transactions: [],
@@ -131,6 +145,7 @@ function migrateState(p) {
   if (!Array.isArray(p.creditCards))  p.creditCards  = [];
   if (!Array.isArray(p.recurring))    p.recurring    = [];
   if (!Array.isArray(p.goals))        p.goals        = [];
+  if (!Array.isArray(p.loans))        p.loans        = [];
   if (p.transactions) p.transactions.forEach(t => { if (t.toAccountId===undefined) t.toAccountId=''; });
   if (p.accounts) p.accounts.forEach(a => {
     if (!a.type) a.type = ['gcash','maya'].includes(a.id) ? 'ewallet' : a.id==='cash' ? 'cash' : 'bank';
@@ -161,10 +176,18 @@ function migrateState(p) {
       g.deposits = (g.saved>0) ? [{id:'d_init_'+g.id, date:todayISO, amount:g.saved||0, note:'Initial balance'}] : [];
       delete g.saved;
     }
-    if (g.linkedCategoryId===undefined)    g.linkedCategoryId='';
-    if (g.linkedSubcategoryId===undefined) g.linkedSubcategoryId='';
+    // Auto-track (linked category) feature removed — freeze the amount it had
+    // accumulated into a one-time deposit so no progress is lost.
+    if (g.linkedCategoryId) {
+      const auto = (p.transactions||[])
+        .filter(t=>t.categoryId===g.linkedCategoryId && (!g.linkedSubcategoryId||t.subcategoryId===g.linkedSubcategoryId))
+        .reduce((s,t)=>s+t.amount,0);
+      if (auto > 0) g.deposits.push({id:'d_mig_'+g.id, date:todayISO, amount:auto, note:'Migrated auto-tracked amount'});
+    }
+    delete g.linkedCategoryId; delete g.linkedSubcategoryId;
     delete g.status;
   });
+  if (p.loans) p.loans.forEach(l => { if (!Array.isArray(l.payments)) l.payments = []; });
   // Fix legacy CC payment transactions recorded as expense — should be transfer
   if (p.transactions) p.transactions.forEach(t => {
     if (t.notes === 'CC payment' && t.type === 'expense') t.type = 'transfer';

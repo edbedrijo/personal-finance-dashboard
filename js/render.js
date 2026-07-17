@@ -95,7 +95,7 @@ function renderTransactions() {
           <div class="tx-icon">${cat?.icon||'💸'}</div>
           <div class="flex-1 min-w-0">
             <div class="text-sm font-medium truncate" style="color:var(--text)">${tx.description}</div>
-            <div class="text-xs mt-0.5" style="color:var(--text-3)">${tx.type==='transfer'?`🔄 Transfer → ${findAccount(tx.toAccountId)?.name||'?'}`:cat?.name||''}${subcat?' · '+subcat.name:''}${(() => { const a=findAccount(tx.accountId); return a ? ` · <span style="color:${state.creditCards.find(c=>c.id===tx.accountId)?'var(--amber)':'var(--text-3)'}">${a.icon||''}${state.creditCards.find(c=>c.id===tx.accountId)?' CC':''} ${a.name}</span>` : ''; })()}</div>
+            <div class="text-xs mt-0.5" style="color:var(--text-3)">${tx.type==='transfer'?(tx.notes==='Goal deposit'?'🎯 Goal deposit':tx.notes==='Loan payment'?'🏦 Loan payment':`🔄 Transfer → ${findAccount(tx.toAccountId)?.name||'?'}`):cat?.name||''}${subcat?' · '+subcat.name:''}${(() => { const a=findAccount(tx.accountId); return a ? ` · <span style="color:${state.creditCards.find(c=>c.id===tx.accountId)?'var(--amber)':'var(--text-3)'}">${a.icon||''}${state.creditCards.find(c=>c.id===tx.accountId)?' CC':''} ${a.name}</span>` : ''; })()}</div>
           </div>
           <div class="flex items-center gap-2 flex-shrink-0">
             <div class="text-sm font-semibold ${tx.type==='income'?'text-pos':tx.type==='transfer'?'text-accent':'text-neg'}">
@@ -440,6 +440,22 @@ function renderDashboard() {
     return dates && dates.due >= todayISO && dates.due <= forecastEnd;
   }).reduce((s,c)=>s+ccDueAmount(c),0);
   const available=spendable+forecastIncome-forecastExpense-ccForecastExp;
+  // Stricter bottom line: subtract EVERY unpaid CC due, even outside the window —
+  // that money is already spoken for, whatever the window says.
+  const allCCDue=ccDueForecast.reduce((s,c)=>s+ccDueAmount(c),0);
+  const afterAllCC=spendable+forecastIncome-forecastExpense-allCCDue;
+  const healthRatio=spendable>0?afterAllCC/spendable:(afterAllCC>=0?1:-1);
+  const weather=afterAllCC<0
+    ? {icon:'⛈️', label:'Stormy', note:'Obligations exceed your available funds'}
+    : healthRatio<0.25 ? {icon:'🌧️', label:'Rainy', note:'Most of your funds are already spoken for'}
+    : healthRatio<0.6  ? {icon:'⛅', label:'Partly cloudy', note:'Covered, but spend with care'}
+    :                    {icon:'☀️', label:'Sunny', note:'Obligations covered with room to spare'};
+  // Upcoming bills strip — everything payable in the next 7 days
+  const next7=toLocalISO(new Date(now.getTime()+7*86400000));
+  const upcomingBills=[
+    ...(state.recurring||[]).filter(r=>r.active&&r.type==='expense'&&r.nextDue<=next7).map(r=>({icon:r.icon||'🔁',name:r.name,date:r.nextDue,amount:r.amount})),
+    ...ccDueForecast.map(c=>({icon:'💳',name:c.name,date:ccCycleDates(c.id)?.due,amount:ccDueAmount(c)})).filter(b=>b.date&&b.date<=next7),
+  ].sort((a,b)=>a.date.localeCompare(b.date));
   // Compute vs Last Month dynamically
   const curMo=now.getMonth(), curYr=now.getFullYear();
   const prevMo=curMo===0?11:curMo-1, prevYr=curMo===0?curYr-1:curYr;
@@ -463,20 +479,26 @@ function renderDashboard() {
     </div>
     <div class="flex items-center justify-between mb-3"><div class="section-label">DEBIT ACCOUNTS</div><div class="text-xs text-pos font-medium">${fmt2(assets)}</div></div>
     <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-3">
-      ${state.accounts.map(a=>`<div class="bg-surface rounded-xl p-4"><div class="flex items-center gap-2 mb-2"><div style="width:24px;height:24px;border-radius:7px;overflow:hidden;flex-shrink:0;font-size:14px;display:flex;align-items:center;justify-content:center">${brandBadge(a.name, a.icon||'')}</div><div class="text-xs text-dim truncate">${a.name}</div></div><div class="text-lg font-semibold">${editable(a.balance,`accounts.${a.id}.balance`,fmt)}</div></div>`).join('')}
+      ${state.accounts.map(a=>`<div class="bg-surface rounded-xl p-4 cursor-pointer" onclick="setView('accounts')"><div class="flex items-center gap-2 mb-2"><div style="width:24px;height:24px;border-radius:7px;overflow:hidden;flex-shrink:0;font-size:14px;display:flex;align-items:center;justify-content:center">${brandBadge(a.name, a.icon||'')}</div><div class="text-xs text-dim truncate">${a.name}</div></div><div class="text-lg font-semibold">${editable(a.balance,`accounts.${a.id}.balance`,fmt)}</div></div>`).join('')}
     </div>
     <div class="flex items-center justify-between mb-3 mt-6"><div class="section-label">CREDIT CARDS</div><div class="text-xs text-neg font-medium">OWED ${fmt2(liab)}</div></div>
     <div class="space-y-3 mb-7">
       ${state.creditCards.map(c=>{
-        const avail=c.limit-c.outstanding, pct=c.limit>0?Math.min((c.outstanding/c.limit)*100,100):0;
-        return `<div class="bg-surface rounded-xl p-4">
+        const avail=c.limit-c.outstanding, pct=c.limit>0?Math.min((Math.max(c.outstanding,0)/c.limit)*100,100):0;
+        return `<div class="bg-surface rounded-xl p-4 cursor-pointer" onclick="setView('accounts')">
           <div class="flex justify-between items-start mb-3">
             <div class="flex items-center gap-3"><div style="width:32px;height:32px;border-radius:9px;overflow:hidden;flex-shrink:0;font-size:18px;display:flex;align-items:center;justify-content:center">${brandBadge(c.name, c.icon||'💳')}</div><div><div class="font-medium">${c.name}</div><div class="text-xs text-dim mt-0.5">${(()=>{const dd=ccCycleDates(c.id);return dd?`Due ${fmtDateShort(dd.due)} · ${dd.daysToDue} days away`:`Due ${c.dueDay}${sfx(c.dueDay)}`})()}</div></div></div>
-            <div class="text-right"><div class="text-neg font-semibold">${fmt2(c.outstanding)}</div><div class="text-xs text-dim">avl. ${fmt2(avail)}</div></div>
+            <div class="text-right"><div class="${c.outstanding<0?'text-pos':'text-neg'} font-semibold">${fmt2(c.outstanding)}</div><div class="text-xs text-dim">${c.outstanding<0?'overpaid (credit)':'avl. '+fmt2(avail)}</div></div>
           </div>
           <div class="bg-surface2 rounded-full overflow-hidden" style="height:3px"><div style="width:${pct}%;height:3px;background:var(--red-strong);border-radius:2px"></div></div>
         </div>`;}).join('')}
     </div>
+    ${upcomingBills.length?`
+    <div class="bg-surface rounded-2xl p-5 mb-4">
+      <div class="flex items-center gap-2 mb-3"><span>📅</span><span class="font-semibold">Due in the next 7 days</span></div>
+      ${upcomingBills.map(b=>`<div class="flex justify-between items-center py-1.5"><div class="text-sm flex items-center gap-2"><span>${b.icon}</span>${b.name}<span class="text-xs" style="color:${b.date<=todayISO?'var(--red)':'var(--text-3)'}">${b.date<=todayISO?'due today':fmtDateShort(b.date)}</span></div><div class="text-sm text-neg">− ${fmt(b.amount)}</div></div>`).join('')}
+      <div class="flex justify-between items-center pt-3 mt-2 border-t border-line"><span class="text-sm font-semibold">Total due</span><span class="font-bold text-neg">− ${fmt(upcomingBills.reduce((s,b)=>s+b.amount,0))}</span></div>
+    </div>`:''}
     <div class="bg-surface rounded-2xl p-5 mb-4">
       <div class="flex items-center justify-between mb-4">
         <div class="flex items-center gap-2"><span>📊</span><span class="font-semibold">${m.label}</span></div>
@@ -508,7 +530,7 @@ function renderDashboard() {
       <div class="bg-surface rounded-2xl p-5">
         <div class="text-xs text-dim mb-1">⏱️ Cash Runway</div>
         <div class="text-2xl font-bold ${runway<14?'text-neg':runway<30?'text-accent':'text-pos'}">${runway}</div>
-        <div class="text-xs text-dimmer mt-1">days remaining</div>
+        <div class="text-xs text-dimmer mt-1">days, if no income comes in</div>
         <div class="mt-3 pt-3 border-t border-line"><div class="text-xs ${runway<14?'text-neg':runway<30?'text-accent':'text-dim'}">${runway<14?'⚠️ Income needed soon':runway<30?'Moderate cushion':'Good buffer'}</div></div>
       </div>
     </div>
@@ -527,7 +549,11 @@ function renderDashboard() {
       </div>
     </div>
     <div class="bg-surface rounded-2xl p-5 mb-4">
-      <div class="flex items-center gap-2 mb-4"><span>🪙</span><span class="font-semibold">Spending Forecast</span></div>
+      <div class="flex items-center justify-between mb-1">
+        <div class="flex items-center gap-2"><span>🪙</span><span class="font-semibold">Spending Forecast</span></div>
+        <div class="text-sm font-semibold flex items-center gap-1.5"><span style="font-size:18px">${weather.icon}</span>${weather.label}</div>
+      </div>
+      <div class="text-xs mb-4" style="color:var(--text-3)">${weather.note}</div>
       <div class="flex gap-2 mb-5 flex-wrap">
         ${[7,14,21,30].map(d=>`<button class="tab-btn text-xs px-3 py-1.5 rounded-full ${state.forecastDays===d?'active':'bg-surface2 text-dim'}" onclick="setForecast(${d})">${d} days</button>`).join('')}
       </div>
@@ -537,15 +563,18 @@ function renderDashboard() {
       <div class="text-xs text-dimmer font-semibold tracking-wider mt-4 mb-2">SCHEDULED EXPENSES</div>
       ${forecastItems.expense.length===0&&ccForecastExp===0?`<div class="text-xs text-dimmer py-1.5">None in this window</div>`:forecastItems.expense.map(r=>`<div class="flex justify-between items-center py-1.5"><div class="text-sm flex items-center gap-2"><span>${r.icon}</span>${r.name}</div><div class="text-sm text-neg">− ${fmt(r.amount)}</div></div>`).join('')}
       ${ccDueForecast.map(c=>{ const dates=ccCycleDates(c.id); const inWindow=dates&&dates.due<=forecastEnd; return `<div class="flex justify-between items-center py-1.5"><div class="text-sm flex items-center gap-2"><span>💳</span>${c.name}<span class="text-xs ml-1" style="color:${inWindow?'var(--amber)':'var(--text-3)'}">due ${dates?fmtDateShort(dates.due):'—'}${inWindow?'':' · outside window'}</span></div><div class="text-sm" style="color:${inWindow?'var(--red)':'var(--text-3)'}">− ${fmt(ccDueAmount(c))}</div></div>`; }).join('')}
-      <div class="flex justify-between items-center pt-4 mt-3 border-t border-line"><span class="font-semibold">Available to spend</span><span class="text-lg font-bold ${available>=0?'text-pos':'text-neg'}">${fmt2(available)}</span></div>
+      <div class="flex justify-between items-center pt-4 mt-3 border-t border-line"><span class="text-sm" style="color:var(--text-2)">Available to spend <span class="text-xs text-dimmer">(this window)</span></span><span class="font-semibold ${available>=0?'text-pos':'text-neg'}">${fmt2(available)}</span></div>
+      <div class="flex justify-between items-center pt-2.5"><span class="font-semibold">After all CC dues <span class="text-xs text-dimmer font-normal">(safe to spend)</span></span><span class="text-lg font-bold ${afterAllCC>=0?'text-pos':'text-neg'}">${fmt2(afterAllCC)}</span></div>
     </div>
+    <div class="bg-surface rounded-2xl p-5 mb-4">
       <div class="flex items-center gap-2 mb-4"><span>🎯</span><span class="font-semibold">Financial Goals</span></div>
-      ${state.goals.map(g=>{
+      <div class="space-y-3">
+      ${state.goals.length===0?`<div class="text-xs text-dimmer py-1.5">No goals yet.</div>`:state.goals.map(g=>{
         const gs=computeGoalSaved(g);
         const remaining=Math.max(g.target-gs.total,0), months=monthsBetween(g.targetDate), monthly=months>0?remaining/months:remaining, daily=monthly/30;
         const pct=g.target>0?Math.min((gs.total/g.target)*100,100):0;
-        const dateLabel=new Date(g.targetDate).toLocaleDateString('en-US',{month:'short',year:'numeric'});
-        return `<div class="rounded-xl p-4" style="background:var(--bg)">
+        const dateLabel=new Date(g.targetDate+'T00:00:00').toLocaleDateString('en-US',{month:'short',year:'numeric'});
+        return `<div class="rounded-xl p-4 cursor-pointer" style="background:var(--bg)" onclick="setView('goals')">
           <div class="flex justify-between items-start mb-3">
             <div><div class="font-semibold">${g.icon} ${g.name}</div><div class="text-xs text-dim mt-0.5">Target: ${dateLabel} · ${months} months away</div></div>
             <div class="text-xs px-2 py-1 rounded-full" style="background:var(--accent-dim);color:var(--accent-text)">${pct.toFixed(1)}%</div>
@@ -553,12 +582,20 @@ function renderDashboard() {
           <div class="flex justify-between text-sm mb-1.5"><span class="text-dim">Saved so far</span><span class="font-semibold text-pos">${fmt(gs.total)} <span class="text-dim">of ${fmt(g.target)}</span></span></div>
           <div class="bg-surface2 rounded-full overflow-hidden mb-4" style="height:6px"><div style="width:${pct.toFixed(1)}%;height:6px;background:linear-gradient(90deg,var(--amber),var(--amber-2));border-radius:3px"></div></div>
           <div class="grid grid-cols-3 gap-2">
-            <div class="bg-surface rounded-lg p-3"><div class="text-xs text-dim">Remaining</div><div class="font-semibold mt-0.5 text-sm">${fmt(remaining)}</div></div>
-            <div class="bg-surface rounded-lg p-3"><div class="text-xs text-dim">Monthly needed</div><div class="font-semibold mt-0.5 text-sm">${fmt(monthly)}</div></div>
-            <div class="bg-surface rounded-lg p-3"><div class="text-xs text-dim">Daily needed</div><div class="font-semibold mt-0.5 text-sm">${fmt(daily)}</div></div>
+            <div class="rounded-lg p-3" style="background:var(--surface2)"><div class="text-xs text-dim">Remaining</div><div class="font-semibold mt-0.5 text-sm">${fmt(remaining)}</div></div>
+            <div class="rounded-lg p-3" style="background:var(--surface2)"><div class="text-xs text-dim">Monthly needed</div><div class="font-semibold mt-0.5 text-sm">${fmt(monthly)}</div></div>
+            <div class="rounded-lg p-3" style="background:var(--surface2)"><div class="text-xs text-dim">Daily needed</div><div class="font-semibold mt-0.5 text-sm">${fmt(daily)}</div></div>
           </div>
         </div>`;}).join('')}
-      <button class="w-full text-sm text-dimmer mt-3 py-3 px-4 border border-dashed border-line rounded-xl hover:border-gray-600 hover:text-dim transition-colors">+ Add another goal</button>
+      </div>
+      ${(state.loans||[]).length?`
+      <div class="text-xs text-dimmer font-semibold tracking-wider mt-4 mb-2">LOANS</div>
+      ${state.loans.map(l=>{ const lt=loanTotals(l); return `
+        <div class="flex justify-between items-center py-1.5 cursor-pointer" onclick="goalUI.tab='loans';setView('goals')">
+          <div class="text-sm flex items-center gap-2"><span>${l.icon||'🏦'}</span>${l.name}<span class="text-xs text-dimmer">${lt.paymentsLeft} payment${lt.paymentsLeft!==1?'s':''} left</span></div>
+          <div class="text-sm text-neg">− ${fmt(lt.remaining)}</div>
+        </div>`;}).join('')}`:''}
+      <button onclick="goalAddFromHome()" class="w-full text-sm text-dimmer mt-3 py-3 px-4 border border-dashed border-line rounded-xl hover:border-gray-600 hover:text-dim transition-colors" style="background:none;cursor:pointer">+ Add another goal</button>
     </div>
     <div class="text-center text-xs text-dimmer mt-8 pb-4">Click any number to edit · Changes saved automatically · <span class="cursor-pointer hover:text-accent" onclick="setView('transactions')">View all transactions →</span></div>`;
 }
@@ -752,12 +789,10 @@ function renderGoals() {
     const deposits=g.deposits||[];
     const isDepositOpen=goalUI.depositGoalId===g.id;
     const isHistoryOpen=goalUI.expandedGoalId===g.id;
-    const linkedCat=g.linkedCategoryId?state.categories.find(c=>c.id===g.linkedCategoryId):null;
-    const linkedSub=g.linkedSubcategoryId&&linkedCat?linkedCat.subs.find(s=>s.id===g.linkedSubcategoryId):null;
 
     if (goalUI.deleteGoalId===g.id) return `
       <div class="rounded-2xl p-5 mb-4" style="background:var(--surface);border:1px solid var(--danger-border)">
-        <div class="text-sm mb-3" style="color:var(--danger-text)">Delete <strong>${g.icon} ${g.name}</strong>? All deposit history will be lost. Cannot be undone.</div>
+        <div class="text-sm mb-3" style="color:var(--danger-text)">Delete <strong>${g.icon} ${g.name}</strong>? All deposit history will be lost (transfers already made stay in Transactions). Cannot be undone.</div>
         <div class="flex gap-2">
           <button onclick="goalConfirmDelete()" class="rounded-lg px-5 py-2 text-sm font-semibold" style="background:var(--red-strong);border:none;color:#fff;cursor:pointer">Delete Goal</button>
           <button onclick="goalCancelDelete()" class="rounded-lg px-5 py-2 text-sm" style="background:var(--btn-ghost);border:none;color:var(--text-2);cursor:pointer">Cancel</button>
@@ -770,6 +805,13 @@ function renderGoals() {
         <div class="grid grid-cols-2 gap-2 mb-2">
           <div><div class="field-label">AMOUNT (₱) *</div><input id="dep-amt-${g.id}" type="number" step="0.01" min="0" placeholder="0.00" class="field-input"></div>
           <div><div class="field-label">DATE</div><input id="dep-date-${g.id}" type="date" value="${todayISO}" class="field-input"></div>
+        </div>
+        <div class="mb-2"><div class="field-label">FROM ACCOUNT (optional)</div>
+          <select id="dep-acct-${g.id}" class="field-select">
+            <option value="">— No account (manual entry) —</option>
+            ${state.accounts.map(a=>`<option value="${a.id}">${a.icon||''} ${a.name} · ${fmt(a.balance)}</option>`).join('')}
+          </select>
+          <div class="text-xs mt-1" style="color:var(--text-3)">Picking an account deducts the amount and logs it as a transfer.</div>
         </div>
         <div class="mb-3"><div class="field-label">NOTE (optional)</div><input id="dep-note-${g.id}" type="text" placeholder="e.g. Monthly savings" class="field-input"></div>
         <div class="flex gap-2">
@@ -790,7 +832,7 @@ function renderGoals() {
         <div class="flex items-center gap-3 py-2" style="border-bottom:1px solid var(--border2)">
           <div class="flex-1 min-w-0">
             <div class="text-sm font-semibold text-pos">+${fmt(d.amount)}</div>
-            <div class="text-xs truncate" style="color:var(--text-3)">${fmtDate(d.date)}${d.note?' · '+d.note:''}</div>
+            <div class="text-xs truncate" style="color:var(--text-3)">${fmtDate(d.date)}${d.accountId?' · '+(findAccount(d.accountId)?.name||'account'):''}${d.note?' · '+d.note:''}</div>
           </div>
           <button onclick="goalAskDeleteDeposit('${g.id}','${d.id}')" style="background:none;border:none;color:var(--text-3);cursor:pointer;font-size:18px;padding:0 4px;line-height:1;flex-shrink:0">×</button>
         </div>`;
@@ -848,13 +890,6 @@ function renderGoals() {
           </div>
         </div>
 
-        ${linkedCat?`
-        <div class="flex items-center gap-2 mb-3 px-3 py-2 rounded-xl text-xs" style="background:var(--accent-dim);border:1px solid var(--accent-border)">
-          <span>🔗</span>
-          <span style="color:var(--accent-text)">Auto-tracking: ${linkedCat.icon} ${linkedCat.name}${linkedSub?' → '+linkedSub.name:''}</span>
-          <span class="ml-auto font-semibold" style="color:var(--accent-text)">+${fmt(gs.auto)}</span>
-        </div>`:''}
-
         <div class="flex gap-2">
           <button onclick="goalOpenDeposit('${g.id}')" class="flex-1 rounded-xl py-2.5 text-sm font-semibold text-white" style="background:var(--accent);border:none;cursor:pointer">+ Deposit</button>
           <button onclick="goalToggleHistory('${g.id}')" class="flex-1 rounded-xl py-2.5 text-sm font-semibold" style="background:var(--surface2);border:1px solid ${isHistoryOpen?'var(--accent)':'var(--border)'};color:${isHistoryOpen?'var(--accent-text)':'var(--text-2)'};cursor:pointer">📋 History (${deposits.length})</button>
@@ -871,23 +906,19 @@ function renderGoals() {
           <div class="text-lg font-bold">New Goal</div>
           <button onclick="goalCloseAdd()" style="background:none;border:none;color:var(--text-3);cursor:pointer;font-size:22px;line-height:1">×</button>
         </div>
+        <div class="mb-3"><div class="field-label">QUICK PICK</div>
+          <div class="flex flex-wrap gap-1.5">
+            ${GOAL_PRESETS.map(p=>`<button type="button" onclick="goalApplyPreset('${p.name}','${p.icon}')" class="text-xs px-2.5 py-1.5 rounded-full" style="background:var(--surface2);border:1px solid var(--border);color:var(--text-2);cursor:pointer">${p.icon} ${p.name}</button>`).join('')}
+          </div>
+        </div>
         <div class="grid gap-3 mb-3" style="grid-template-columns:56px 1fr">
           <div><div class="field-label">ICON</div><input type="hidden" id="goal-icon" value="🎯">
           <button type="button" onclick="iconPickerOpen('goal-icon','goal')" id="goal-icon-btn" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'" style="width:100%;height:44px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;font-size:24px;cursor:pointer;line-height:1;transition:border-color 0.15s">🎯</button></div>
           <div><div class="field-label">GOAL NAME *</div><input id="goal-name" type="text" placeholder="e.g. Emergency Fund" class="field-input"></div>
         </div>
-        <div class="grid grid-cols-2 gap-3 mb-3">
+        <div class="grid grid-cols-2 gap-3 mb-5">
           <div><div class="field-label">TARGET (₱) *</div><input id="goal-target" type="number" step="0.01" min="0" placeholder="0.00" class="field-input"></div>
           <div><div class="field-label">TARGET DATE *</div><input id="goal-date" type="date" class="field-input"></div>
-        </div>
-        <div class="mb-3"><div class="field-label">AUTO-TRACK CATEGORY (optional)</div>
-          <select id="goal-cat" class="field-select" onchange="goalUpdateSub('goal-cat','goal-subcat')">
-            <option value="">— None (manual only) —</option>
-            ${state.categories.filter(c=>c.active).map(c=>`<option value="${c.id}">${c.icon} ${c.name}</option>`).join('')}
-          </select>
-        </div>
-        <div class="mb-5"><div class="field-label">SUBCATEGORY (optional)</div>
-          <select id="goal-subcat" class="field-select"><option value="">— All subcategories —</option></select>
         </div>
         <div id="goal-err" class="text-neg text-xs mb-3"></div>
         <div class="flex gap-3">
@@ -909,21 +940,9 @@ function renderGoals() {
           <button type="button" onclick="iconPickerOpen('edit-goal-icon','goal')" id="edit-goal-icon-btn" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'" style="width:100%;height:44px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;font-size:24px;cursor:pointer;line-height:1;transition:border-color 0.15s">${editGoal.icon||'🎯'}</button></div>
           <div><div class="field-label">GOAL NAME *</div><input id="edit-goal-name" type="text" value="${editGoal.name}" class="field-input"></div>
         </div>
-        <div class="grid grid-cols-2 gap-3 mb-3">
+        <div class="grid grid-cols-2 gap-3 mb-5">
           <div><div class="field-label">TARGET (₱) *</div><input id="edit-goal-target" type="number" step="0.01" value="${editGoal.target}" class="field-input"></div>
           <div><div class="field-label">TARGET DATE *</div><input id="edit-goal-date" type="date" value="${editGoal.targetDate}" class="field-input"></div>
-        </div>
-        <div class="mb-3"><div class="field-label">AUTO-TRACK CATEGORY</div>
-          <select id="edit-goal-cat" class="field-select" onchange="goalUpdateSub('edit-goal-cat','edit-goal-subcat')">
-            <option value="">— None —</option>
-            ${state.categories.filter(c=>c.active).map(c=>`<option value="${c.id}" ${editGoal.linkedCategoryId===c.id?'selected':''}>${c.icon} ${c.name}</option>`).join('')}
-          </select>
-        </div>
-        <div class="mb-5"><div class="field-label">SUBCATEGORY</div>
-          <select id="edit-goal-subcat" class="field-select">
-            <option value="">— All subcategories —</option>
-            ${editGoal.linkedCategoryId?(state.categories.find(c=>c.id===editGoal.linkedCategoryId)?.subs||[]).filter(s=>s.active).map(s=>`<option value="${s.id}" ${editGoal.linkedSubcategoryId===s.id?'selected':''}>${s.name}</option>`).join(''):''}
-          </select>
         </div>
         <div class="flex gap-3">
           <button onclick="goalUpdate('${editGoal.id}')" class="flex-1 rounded-xl py-3 font-semibold text-white text-sm" style="background:var(--accent);border:none;cursor:pointer">Save Changes</button>
@@ -932,23 +951,204 @@ function renderGoals() {
       </div>
     </div>`:'';
 
+  // ── Loans tab ──
+  function loanCard(l) {
+    const lt=loanTotals(l);
+    const isPayOpen=goalUI.paymentLoanId===l.id;
+    const isHistOpen=goalUI.expandedLoanId===l.id;
+    const payments=l.payments||[];
+
+    if (goalUI.deleteLoanId===l.id) return `
+      <div class="rounded-2xl p-5 mb-4" style="background:var(--surface);border:1px solid var(--danger-border)">
+        <div class="text-sm mb-3" style="color:var(--danger-text)">Delete <strong>${l.icon} ${l.name}</strong>? All payment history will be lost (transfers already made stay in Transactions). Cannot be undone.</div>
+        <div class="flex gap-2">
+          <button onclick="loanConfirmDelete()" class="rounded-lg px-5 py-2 text-sm font-semibold" style="background:var(--red-strong);border:none;color:#fff;cursor:pointer">Delete Loan</button>
+          <button onclick="loanCancelDelete()" class="rounded-lg px-5 py-2 text-sm" style="background:var(--btn-ghost);border:none;color:var(--text-2);cursor:pointer">Cancel</button>
+        </div>
+      </div>`;
+
+    const payForm=isPayOpen?`
+      <div class="mt-4 pt-4" style="border-top:1px solid var(--border)">
+        <div class="section-label mb-3">RECORD PAYMENT</div>
+        <div class="grid grid-cols-2 gap-2 mb-2">
+          <div><div class="field-label">AMOUNT (₱) *</div><input id="pay-amt-${l.id}" type="number" step="0.01" min="0" value="${lt.monthlyPayment>0?lt.monthlyPayment.toFixed(2):''}" class="field-input"></div>
+          <div><div class="field-label">DATE</div><input id="pay-date-${l.id}" type="date" value="${todayISO}" class="field-input"></div>
+        </div>
+        <div class="mb-2"><div class="field-label">FROM ACCOUNT (optional)</div>
+          <select id="pay-acct-${l.id}" class="field-select">
+            <option value="">— No account (manual entry) —</option>
+            ${state.accounts.map(a=>`<option value="${a.id}">${a.icon||''} ${a.name} · ${fmt(a.balance)}</option>`).join('')}
+          </select>
+          <div class="text-xs mt-1" style="color:var(--text-3)">Picking an account deducts the amount and logs it as a transfer.</div>
+        </div>
+        <div class="mb-3"><div class="field-label">NOTE (optional)</div><input id="pay-note-${l.id}" type="text" placeholder="e.g. July amortization" class="field-input"></div>
+        <div class="flex gap-2">
+          <button onclick="loanAddPayment('${l.id}')" class="flex-1 rounded-xl py-2.5 text-sm font-semibold text-white" style="background:var(--accent);border:none;cursor:pointer">Save Payment</button>
+          <button onclick="loanClosePayment()" class="flex-1 rounded-xl py-2.5 text-sm" style="background:var(--btn-ghost);border:none;color:var(--text-2);cursor:pointer">Cancel</button>
+        </div>
+      </div>`:'';
+
+    const histRows=payments.slice().reverse().map(p=>{
+      const isDel=goalUI.deleteLoanPaymentKey&&goalUI.deleteLoanPaymentKey.loanId===l.id&&goalUI.deleteLoanPaymentKey.paymentId===p.id;
+      if(isDel) return `
+        <div class="flex items-center gap-3 py-2" style="border-bottom:1px solid var(--border2)">
+          <div class="flex-1 text-xs" style="color:var(--danger-text)">Remove ${fmt(p.amount)} payment?</div>
+          <button onclick="loanConfirmDeletePayment()" class="text-xs px-3 py-1 rounded-lg" style="background:var(--red-strong);border:none;color:#fff;cursor:pointer">Remove</button>
+          <button onclick="loanCancelDeletePayment()" class="text-xs px-3 py-1 rounded-lg" style="background:var(--btn-ghost);border:none;color:var(--text-2);cursor:pointer">Keep</button>
+        </div>`;
+      return `
+        <div class="flex items-center gap-3 py-2" style="border-bottom:1px solid var(--border2)">
+          <div class="flex-1 min-w-0">
+            <div class="text-sm font-semibold text-pos">−${fmt(p.amount)}</div>
+            <div class="text-xs truncate" style="color:var(--text-3)">${fmtDate(p.date)}${p.accountId?' · '+(findAccount(p.accountId)?.name||'account'):''}${p.note?' · '+p.note:''}</div>
+          </div>
+          <button onclick="loanAskDeletePayment('${l.id}','${p.id}')" style="background:none;border:none;color:var(--text-3);cursor:pointer;font-size:18px;padding:0 4px;line-height:1;flex-shrink:0">×</button>
+        </div>`;
+    }).join('');
+
+    const histSection=isHistOpen?`
+      <div class="mt-4 pt-4" style="border-top:1px solid var(--border)">
+        <div class="section-label mb-2">PAYMENT HISTORY</div>
+        ${payments.length===0?`<div class="text-sm text-center py-3" style="color:var(--text-3)">No payments recorded yet.</div>`:histRows}
+      </div>`:'';
+
+    const barColor='linear-gradient(90deg,var(--green-strong),var(--green))';
+    return `
+      <div class="rounded-2xl p-5 mb-4" style="background:var(--surface)">
+        <div class="flex items-start justify-between mb-4">
+          <div>
+            <div class="flex items-center gap-2 text-lg font-bold">${l.icon} ${l.name}</div>
+            <div class="text-xs mt-0.5" style="color:var(--text-3)">${fmt(l.principal)} principal · ${l.termMonths} months${l.monthlyRate?` · ${l.monthlyRate}%/mo add-on`:''}${l.annualEIR?` · ${l.annualEIR}% EIR p.a.`:''}</div>
+          </div>
+          <div class="flex gap-1 flex-shrink-0">
+            <button onclick="loanOpenEdit('${l.id}')" style="background:var(--surface2);border:none;color:var(--text-2);cursor:pointer;border-radius:8px;padding:6px 8px;font-size:13px">✏️</button>
+            <button onclick="loanAskDelete('${l.id}')" style="background:var(--surface2);border:none;color:var(--text-2);cursor:pointer;border-radius:8px;padding:6px 8px;font-size:13px">🗑️</button>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-3 mb-4">
+          <div class="flex-1 rounded-full overflow-hidden" style="height:9px;background:var(--surface2)">
+            <div style="width:${lt.pctPaid.toFixed(1)}%;height:9px;background:${barColor};border-radius:5px;transition:width 0.5s ease"></div>
+          </div>
+          <span class="text-sm font-bold flex-shrink-0" style="min-width:48px;text-align:right;color:var(--green)">${lt.pctPaid.toFixed(1)}%</span>
+        </div>
+
+        <div class="grid grid-cols-3 gap-2 mb-3">
+          <div class="rounded-xl p-3 text-center" style="background:var(--surface2)">
+            <div class="text-xs mb-1" style="color:var(--text-3)">Paid</div>
+            <div class="font-bold text-sm text-pos">${fmt(lt.paid)}</div>
+          </div>
+          <div class="rounded-xl p-3 text-center" style="background:var(--surface2)">
+            <div class="text-xs mb-1" style="color:var(--text-3)">Total payable</div>
+            <div class="font-bold text-sm">${fmt(lt.totalPayable)}</div>
+          </div>
+          <div class="rounded-xl p-3 text-center" style="background:var(--surface2)">
+            <div class="text-xs mb-1" style="color:var(--text-3)">Remaining</div>
+            <div class="font-bold text-sm text-neg">${fmt(lt.remaining)}</div>
+          </div>
+        </div>
+
+        <div class="rounded-xl p-3 mb-3" style="background:var(--surface2)">
+          <div class="flex justify-between text-sm mb-1.5">
+            <span style="color:var(--text-3)">Monthly payment</span><span class="font-semibold">${fmt2(lt.monthlyPayment)}</span>
+          </div>
+          <div class="flex justify-between text-sm mb-1.5">
+            <span style="color:var(--text-3)">Total interest cost</span><span class="font-semibold text-neg">${fmt(lt.totalInterest)} (${lt.interestPct.toFixed(1)}%)</span>
+          </div>
+          <div class="flex justify-between text-sm">
+            <span style="color:var(--text-3)">Payments left</span><span class="font-semibold">${lt.paymentsLeft} of ${l.termMonths}</span>
+          </div>
+        </div>
+
+        <div class="flex gap-2">
+          <button onclick="loanOpenPayment('${l.id}')" class="flex-1 rounded-xl py-2.5 text-sm font-semibold text-white" style="background:var(--accent);border:none;cursor:pointer">+ Record Payment</button>
+          <button onclick="loanToggleHistory('${l.id}')" class="flex-1 rounded-xl py-2.5 text-sm font-semibold" style="background:var(--surface2);border:1px solid ${isHistOpen?'var(--accent)':'var(--border)'};color:${isHistOpen?'var(--accent-text)':'var(--text-2)'};cursor:pointer">📋 History (${payments.length})</button>
+        </div>
+        ${payForm}${histSection}
+      </div>`;
+  }
+
+  function loanModal(l) {
+    const isEdit=!!l, pfx=isEdit?'edit-':'', title=isEdit?'Edit Loan':'New Loan';
+    const onClose=isEdit?'loanCancelEdit()':'loanCloseAdd()';
+    const onSave=isEdit?`loanUpdate('${l.id}')`:'loanSave()';
+    const lt=l?loanTotals(l):null;
+    return `
+    <div class="fixed inset-0 flex items-end sm:items-center justify-center" style="z-index:200;background:rgba(0,0,0,0.8)" onclick="${onClose}">
+      <div class="w-full sm:w-96 rounded-t-3xl sm:rounded-2xl p-6" style="background:var(--surface);border:1px solid var(--border);max-height:92vh;overflow-y:auto" onclick="event.stopPropagation()">
+        <div class="flex items-center justify-between mb-5">
+          <div class="text-lg font-bold">${title}</div>
+          <button onclick="${onClose}" style="background:none;border:none;color:var(--text-3);cursor:pointer;font-size:22px;line-height:1">×</button>
+        </div>
+        <div class="grid gap-3 mb-3" style="grid-template-columns:56px 1fr">
+          <div><div class="field-label">ICON</div><input type="hidden" id="${pfx}loan-icon" value="${l?l.icon||'🏦':'🏦'}">
+          <button type="button" onclick="iconPickerOpen('${pfx}loan-icon','loan')" id="${pfx}loan-icon-btn" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'" style="width:100%;height:44px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;font-size:24px;cursor:pointer;line-height:1;transition:border-color 0.15s">${l?l.icon||'🏦':'🏦'}</button></div>
+          <div><div class="field-label">LOAN NAME *</div><input id="${pfx}loan-name" type="text" ${l?`value="${l.name}"`:'placeholder="e.g. Car Loan"'} class="field-input"></div>
+        </div>
+        <div class="grid grid-cols-2 gap-3 mb-3">
+          <div><div class="field-label">PRINCIPAL (₱) *</div><input id="${pfx}loan-principal" type="number" step="0.01" min="0" ${l?`value="${l.principal}"`:'placeholder="300000"'} class="field-input" oninput="loanRecalc('${pfx}')"></div>
+          <div><div class="field-label">TERM (MONTHS) *</div><input id="${pfx}loan-term" type="number" step="1" min="1" ${l?`value="${l.termMonths}"`:'placeholder="36"'} class="field-input" oninput="loanRecalc('${pfx}')"></div>
+        </div>
+        <div class="grid grid-cols-2 gap-3 mb-1">
+          <div><div class="field-label">MONTHLY RATE (%)</div><input id="${pfx}loan-rate" type="number" step="0.01" min="0" ${l?`value="${l.monthlyRate||''}"`:'placeholder="0.49"'} class="field-input" oninput="loanRecalc('${pfx}')"></div>
+          <div><div class="field-label">EIR % P.A. (optional)</div><input id="${pfx}loan-eir" type="number" step="0.01" min="0" ${l?`value="${l.annualEIR||''}"`:'placeholder="11.32"'} class="field-input"></div>
+        </div>
+        <div class="text-xs mb-3" style="color:var(--text-3)">Monthly rate = the bank's add-on/factor rate charged on the original principal each month. EIR is the true annual cost — informational only.</div>
+        <div class="grid grid-cols-2 gap-3 mb-2">
+          <div><div class="field-label">START DATE</div><input id="${pfx}loan-start" type="date" value="${l?.startDate||todayISO}" class="field-input"></div>
+          <div><div class="field-label">MONTHLY PAYMENT (₱)</div><input id="${pfx}loan-payment" type="number" step="0.01" min="0" ${l?`value="${lt.monthlyPayment.toFixed(2)}"`:'placeholder="auto"'} class="field-input" oninput="this.dataset.touched=1"></div>
+        </div>
+        <div id="${pfx}loan-summary" class="text-xs font-semibold mb-3" style="color:var(--accent-text)">${l?`Total payable ${fmt(lt.totalPayable)} · Total interest ${fmt(lt.totalInterest)} (${lt.interestPct.toFixed(1)}% of principal)`:''}</div>
+        ${isEdit?'':'<div id="loan-err" class="text-neg text-xs mb-3"></div>'}
+        <div class="flex gap-3">
+          <button onclick="${onSave}" class="flex-1 rounded-xl py-3 font-semibold text-white text-sm" style="background:var(--accent);border:none;cursor:pointer">${isEdit?'Save Changes':'Add Loan'}</button>
+          <button onclick="${onClose}" class="flex-1 rounded-xl py-3 text-sm" style="background:var(--surface2);border:1px solid var(--border);color:var(--text-2);cursor:pointer">Cancel</button>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  const loans=state.loans||[];
+  const editLoan=goalUI.editLoanId?loans.find(l=>l.id===goalUI.editLoanId):null;
+  const isLoans=goalUI.tab==='loans';
   const totalSaved=state.goals.reduce((s,g)=>s+computeGoalSaved(g).total,0);
   const totalTarget=state.goals.reduce((s,g)=>s+g.target,0);
+  const totalOwed=loans.reduce((s,l)=>s+loanTotals(l).remaining,0);
+
+  const subNav=`
+    <div class="nav-scroll mb-5" style="margin-top:0">
+      <nav class="subnav-pill">
+        <span class="nav-item ${!isLoans?'active':''}" onclick="goalSetTab('goals')">🎯 Savings Goals</span>
+        <span class="nav-item ${isLoans?'active':''}" onclick="goalSetTab('loans')">🏦 Loans</span>
+      </nav>
+    </div>`;
 
   return `${renderNav()}
     <div class="flex items-center justify-between mb-1">
       <div class="text-2xl font-bold">Goals</div>
-      <button onclick="goalOpenAdd()" class="rounded-xl px-4 py-2.5 text-sm font-semibold text-white flex-shrink-0" style="background:var(--accent);border:none;cursor:pointer">+ Add Goal</button>
+      <button onclick="${isLoans?'loanOpenAdd()':'goalOpenAdd()'}" class="rounded-xl px-4 py-2.5 text-sm font-semibold text-white flex-shrink-0" style="background:var(--accent);border:none;cursor:pointer">${isLoans?'+ Add Loan':'+ Add Goal'}</button>
     </div>
-    <div class="section-label mb-5">${state.goals.length} Goal${state.goals.length!==1?'s':''} · ${fmt(totalSaved)} saved of ${fmt(totalTarget)}</div>
-    ${state.goals.length===0?`
-      <div class="flex flex-col items-center justify-center py-20 text-center">
-        <div class="text-5xl mb-4">🎯</div>
-        <div class="text-xl font-bold mb-2">No goals yet</div>
-        <div class="text-sm max-w-xs mb-5" style="color:var(--text-3)">Set a savings goal and track your progress.</div>
-        <button onclick="goalOpenAdd()" class="rounded-xl px-6 py-3 text-sm font-semibold text-white" style="background:var(--accent);border:none;cursor:pointer">+ Create your first goal</button>
-      </div>`:state.goals.map(g=>goalCard(g)).join('')}
-    ${addModal}${editModal}`;
+    <div class="section-label mb-4">${isLoans
+      ?`${loans.length} Loan${loans.length!==1?'s':''} · ${fmt(totalOwed)} still owed`
+      :`${state.goals.length} Goal${state.goals.length!==1?'s':''} · ${fmt(totalSaved)} saved of ${fmt(totalTarget)}`}</div>
+    ${subNav}
+    ${isLoans
+      ? (loans.length===0?`
+        <div class="flex flex-col items-center justify-center py-20 text-center">
+          <div class="text-5xl mb-4">🏦</div>
+          <div class="text-xl font-bold mb-2">No loans tracked</div>
+          <div class="text-sm max-w-xs mb-5" style="color:var(--text-3)">Record a loan to track payments, remaining balance, and the real interest cost.</div>
+          <button onclick="loanOpenAdd()" class="rounded-xl px-6 py-3 text-sm font-semibold text-white" style="background:var(--accent);border:none;cursor:pointer">+ Track your first loan</button>
+        </div>`:loans.map(l=>loanCard(l)).join(''))
+      : (state.goals.length===0?`
+        <div class="flex flex-col items-center justify-center py-20 text-center">
+          <div class="text-5xl mb-4">🎯</div>
+          <div class="text-xl font-bold mb-2">No goals yet</div>
+          <div class="text-sm max-w-xs mb-5" style="color:var(--text-3)">Set a savings goal and track your progress.</div>
+          <button onclick="goalOpenAdd()" class="rounded-xl px-6 py-3 text-sm font-semibold text-white" style="background:var(--accent);border:none;cursor:pointer">+ Create your first goal</button>
+        </div>`:state.goals.map(g=>goalCard(g)).join(''))}
+    ${addModal}${editModal}
+    ${goalUI.showAddLoan?loanModal(null):''}${editLoan?loanModal(editLoan):''}`;
 }
 
 
