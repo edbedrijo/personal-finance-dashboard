@@ -477,21 +477,23 @@ function renderDashboard() {
       </div>
       ${spendable!==assets?`<div style="margin-top:14px;padding-top:12px;border-top:1px solid rgba(28,25,23,0.25);display:flex;justify-content:space-between;align-items:center"><div class="text-xs font-medium" style="color:rgba(28,25,23,0.8)">Spendable (excl. maintaining bal.)</div><div class="text-sm font-bold">${maskAmt(fmt2(spendable))}</div></div>`:''}
     </div>
-    <div class="flex items-center justify-between mb-3"><div class="section-label">DEBIT ACCOUNTS</div><div class="text-xs text-pos font-medium">${fmt2(assets)}</div></div>
-    <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-3">
-      ${state.accounts.map(a=>`<div class="bg-surface rounded-xl p-4 cursor-pointer" onclick="setView('accounts')"><div class="flex items-center gap-2 mb-2"><div style="width:24px;height:24px;border-radius:7px;overflow:hidden;flex-shrink:0;font-size:14px;display:flex;align-items:center;justify-content:center">${brandBadge(a.name, a.icon||'')}</div><div class="text-xs text-dim truncate">${a.name}</div></div><div class="text-lg font-semibold">${editable(a.balance,`accounts.${a.id}.balance`,fmt)}</div></div>`).join('')}
-    </div>
-    <div class="flex items-center justify-between mb-3 mt-6"><div class="section-label">CREDIT CARDS</div><div class="text-xs text-neg font-medium">OWED ${fmt2(liab)}</div></div>
-    <div class="space-y-3 mb-7">
-      ${state.creditCards.map(c=>{
-        const avail=c.limit-c.outstanding, pct=c.limit>0?Math.min((Math.max(c.outstanding,0)/c.limit)*100,100):0;
-        return `<div class="bg-surface rounded-xl p-4 cursor-pointer" onclick="setView('accounts')">
-          <div class="flex justify-between items-start mb-3">
-            <div class="flex items-center gap-3"><div style="width:32px;height:32px;border-radius:9px;overflow:hidden;flex-shrink:0;font-size:18px;display:flex;align-items:center;justify-content:center">${brandBadge(c.name, c.icon||'💳')}</div><div><div class="font-medium">${c.name}</div><div class="text-xs text-dim mt-0.5">${(()=>{const dd=ccCycleDates(c.id);return dd?`Due ${fmtDateShort(dd.due)} · ${dd.daysToDue} days away`:`Due ${c.dueDay}${sfx(c.dueDay)}`})()}</div></div></div>
-            <div class="text-right"><div class="${c.outstanding<0?'text-pos':'text-neg'} font-semibold">${fmt2(c.outstanding)}</div><div class="text-xs text-dim">${c.outstanding<0?'overpaid (credit)':'avl. '+fmt2(avail)}</div></div>
-          </div>
-          <div class="bg-surface2 rounded-full overflow-hidden" style="height:3px"><div style="width:${pct}%;height:3px;background:var(--red-strong);border-radius:2px"></div></div>
-        </div>`;}).join('')}
+    <div class="bg-surface rounded-2xl p-5 mb-4">
+      <div class="flex items-center justify-between mb-3"><div class="section-label">DEBIT ACCOUNTS</div><div class="text-xs text-pos font-medium">${fmt2(assets)}</div></div>
+      <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-3">
+        ${state.accounts.map(a=>`<div class="rounded-xl p-4 cursor-pointer" style="background:var(--bg)" onclick="setView('accounts')"><div class="flex items-center gap-2 mb-2"><div style="width:24px;height:24px;border-radius:7px;overflow:hidden;flex-shrink:0;font-size:14px;display:flex;align-items:center;justify-content:center">${brandBadge(a.name, a.icon||'')}</div><div class="text-xs text-dim truncate">${a.name}</div></div><div class="text-lg font-semibold">${editable(a.balance,`accounts.${a.id}.balance`,fmt)}</div></div>`).join('')}
+      </div>
+      <div class="flex items-center justify-between mb-3 mt-5 pt-4 border-t border-line"><div class="section-label">CREDIT CARDS</div><div class="text-xs text-neg font-medium">OWED ${fmt2(liab)}</div></div>
+      <div class="space-y-3">
+        ${state.creditCards.map(c=>{
+          const avail=c.limit-c.outstanding, pct=c.limit>0?Math.min((Math.max(c.outstanding,0)/c.limit)*100,100):0;
+          return `<div class="rounded-xl p-4 cursor-pointer" style="background:var(--bg)" onclick="setView('accounts')">
+            <div class="flex justify-between items-start mb-3">
+              <div class="flex items-center gap-3"><div style="width:32px;height:32px;border-radius:9px;overflow:hidden;flex-shrink:0;font-size:18px;display:flex;align-items:center;justify-content:center">${brandBadge(c.name, c.icon||'💳')}</div><div><div class="font-medium">${c.name}</div><div class="text-xs text-dim mt-0.5">${(()=>{const dd=ccCycleDates(c.id);return dd?`Due ${fmtDateShort(dd.due)} · ${dd.daysToDue} days away`:`Due ${c.dueDay}${sfx(c.dueDay)}`})()}</div></div></div>
+              <div class="text-right"><div class="${c.outstanding<0?'text-pos':'text-neg'} font-semibold">${fmt2(c.outstanding)}</div><div class="text-xs text-dim">${c.outstanding<0?'overpaid (credit)':'avl. '+fmt2(avail)}</div></div>
+            </div>
+            <div class="bg-surface2 rounded-full overflow-hidden" style="height:3px"><div style="width:${pct}%;height:3px;background:var(--red-strong);border-radius:2px"></div></div>
+          </div>`;}).join('')}
+      </div>
     </div>
     ${upcomingBills.length?`
     <div class="bg-surface rounded-2xl p-5 mb-4">
