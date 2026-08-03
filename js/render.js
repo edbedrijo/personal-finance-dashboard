@@ -95,7 +95,7 @@ function renderTransactions() {
           <div class="tx-icon">${cat?.icon||'💸'}</div>
           <div class="flex-1 min-w-0">
             <div class="text-sm font-medium truncate" style="color:var(--text)">${tx.description}</div>
-            <div class="text-xs mt-0.5" style="color:var(--text-3)">${tx.type==='transfer'?(tx.notes==='Goal deposit'?'🎯 Goal deposit':tx.notes==='Loan payment'?'🏦 Loan payment':`🔄 Transfer → ${findAccount(tx.toAccountId)?.name||'?'}`):cat?.name||''}${subcat?' · '+subcat.name:''}${(() => { const a=findAccount(tx.accountId); return a ? ` · <span style="color:${state.creditCards.find(c=>c.id===tx.accountId)?'var(--amber)':'var(--text-3)'}">${a.icon||''}${state.creditCards.find(c=>c.id===tx.accountId)?' CC':''} ${a.name}</span>` : ''; })()}</div>
+            <div class="text-xs mt-0.5" style="color:var(--text-3)">${tx.type==='transfer'?(tx.notes==='Goal deposit'?'🎯 Goal deposit':tx.notes==='Loan payment'?'🏦 Loan payment':tx.notes==='Loan disbursement'?`💵 Loan proceeds → ${findAccount(tx.toAccountId)?.name||'?'}`:`🔄 Transfer → ${findAccount(tx.toAccountId)?.name||'?'}`):cat?.name||''}${subcat?' · '+subcat.name:''}${(() => { const a=findAccount(tx.accountId); return a ? ` · <span style="color:${state.creditCards.find(c=>c.id===tx.accountId)?'var(--amber)':'var(--text-3)'}">${a.icon||''}${state.creditCards.find(c=>c.id===tx.accountId)?' CC':''} ${a.name}</span>` : ''; })()}</div>
           </div>
           <div class="flex items-center gap-2 flex-shrink-0">
             <div class="text-sm font-semibold ${tx.type==='income'?'text-pos':tx.type==='transfer'?'text-accent':'text-neg'}">
@@ -1101,6 +1101,11 @@ function renderGoals() {
           <div><div class="field-label">MONTHLY PAYMENT (₱)</div><input id="${pfx}loan-payment" type="number" step="0.01" min="0" ${l?`value="${lt.monthlyPayment.toFixed(2)}"`:'placeholder="auto"'} class="field-input" oninput="this.dataset.touched=1"></div>
         </div>
         <div id="${pfx}loan-summary" class="text-xs font-semibold mb-3" style="color:var(--accent-text)">${l?`Total payable ${fmt(lt.totalPayable)} · Total interest ${fmt(lt.totalInterest)} (${lt.interestPct.toFixed(1)}% of principal)`:''}</div>
+        ${isEdit?'':`<div class="mb-3">
+          <div class="field-label">DEPOSIT PROCEEDS TO (optional)</div>
+          <select id="loan-deposit-acct" class="field-input"><option value="">— Don't record cash-in —</option>${(state.accounts||[]).map(a=>`<option value="${a.id}">${a.icon||''} ${a.name}</option>`).join('')}</select>
+          <div class="text-xs mt-1" style="color:var(--text-3)">Credits this account with the principal and logs it as a loan disbursement — not counted as income.</div>
+        </div>`}
         ${isEdit?'':'<div id="loan-err" class="text-neg text-xs mb-3"></div>'}
         <div class="flex gap-3">
           <button onclick="${onSave}" class="flex-1 rounded-xl py-3 font-semibold text-white text-sm" style="background:var(--accent);border:none;cursor:pointer">${isEdit?'Save Changes':'Add Loan'}</button>
@@ -1265,9 +1270,9 @@ function renderAccounts() {
           <div><div class="field-label">CUT-OFF DAY</div><input id="edit-cc-cutoff-${c.id}" type="number" min="1" max="31" value="${c.cutoffDay||22}" class="field-input" title="Last day of billing cycle (from your statement)"></div>
           <div><div class="field-label">DUE DAY</div><input id="edit-cc-due-${c.id}" type="number" min="1" max="31" value="${c.dueDay}" class="field-input" title="Payment due date"></div>
         </div>
-        <div class="grid grid-cols-2 gap-3 mb-3">
-          <div><div class="field-label">STATEMENT BALANCE (₱)</div><input id="edit-cc-last-stmt-${c.id}" type="number" step="0.01" value="${c.lastStatement||0}" class="field-input" title="Total Amount Due from your last statement"></div>
-          <div><div class="field-label">MIN. AMOUNT DUE (₱)</div><input id="edit-cc-min-due-${c.id}" type="number" step="0.01" value="${c.minDue||0}" class="field-input" title="Minimum Amount Due from your last statement"></div>
+        <div class="mb-3">
+          <div class="field-label">STATEMENT BALANCE (₱)</div><input id="edit-cc-last-stmt-${c.id}" type="number" step="0.01" value="${c.lastStatement||0}" class="field-input" title="Auto-filled after each cut-off. Edit to override with the exact figure from your bank statement.">
+          <div class="text-xs mt-1" style="color:var(--text-3)">Auto-updates after each cut-off. Edit to match your bank exactly.</div>
         </div>
         <div class="flex gap-2">
           <button onclick="ccUpdate('${c.id}')" class="flex-1 rounded-lg py-2 text-sm font-semibold text-white" style="background:var(--accent);border:none;cursor:pointer">Save</button>
@@ -1295,7 +1300,6 @@ function renderAccounts() {
           <div class="flex gap-2 mt-2 flex-wrap">
             <button onclick="document.getElementById('cc-pay-amt').value='${c.outstanding}'" class="text-xs px-3 py-1.5 rounded-lg" style="background:var(--surface2);border:1px solid var(--border);color:var(--text-2);cursor:pointer">Current bal · ${fmt(c.outstanding)}</button>
             ${c.lastStatement>0?`<button onclick="document.getElementById('cc-pay-amt').value='${c.lastStatement}'" class="text-xs px-3 py-1.5 rounded-lg" style="background:var(--surface2);border:1px solid var(--amber-border);color:var(--amber-2);cursor:pointer">Stmt bal · ${fmt(c.lastStatement)}</button>`:''}
-            ${c.minDue>0?`<button onclick="document.getElementById('cc-pay-amt').value='${c.minDue}'" class="text-xs px-3 py-1.5 rounded-lg" style="background:var(--surface2);border:1px solid var(--border);color:var(--text-2);cursor:pointer">Min due · ${fmt(c.minDue)}</button>`:''}
           </div>
         </div>
         <div class="mb-4">
@@ -1415,12 +1419,6 @@ function renderAccounts() {
           </div>
         </div>
 
-        ${c.minDue>0&&!isPaid?`
-        <div class="flex items-center justify-between py-2 px-3 rounded-lg mb-3" style="background:var(--amber-dim);border:1px solid var(--amber-border)">
-          <div class="text-xs" style="color:var(--text-2)">⚠️ Minimum Amount Due <span style="color:var(--text-3)">· pay by ${dueLabel}</span></div>
-          <div class="text-sm font-bold text-accent">${fmt(c.minDue)}</div>
-        </div>`:''}
-
         <!-- Utilization bar -->
         <div class="flex items-center gap-2">
           <div class="flex-1 rounded-full overflow-hidden" style="height:5px;background:var(--surface)">
@@ -1477,9 +1475,8 @@ function renderAccounts() {
           <div><div class="field-label">CUT-OFF DAY</div><input id="cc-cutoff" type="number" min="1" max="31" placeholder="22" class="field-input" title="Last day of billing cycle (from your statement)"></div>
           <div><div class="field-label">DUE DAY</div><input id="cc-due" type="number" min="1" max="31" placeholder="8" class="field-input"></div>
         </div>
-        <div class="grid grid-cols-2 gap-3 mb-3">
-          <div><div class="field-label">STATEMENT BAL. (₱)</div><input id="cc-last-stmt" type="number" step="0.01" min="0" placeholder="0.00" class="field-input" title="Total Amount Due from your last statement"></div>
-          <div><div class="field-label">MIN. AMOUNT DUE (₱)</div><input id="cc-min-due" type="number" step="0.01" min="0" placeholder="0.00" class="field-input"></div>
+        <div class="mb-3">
+          <div class="field-label">STATEMENT BAL. (₱)</div><input id="cc-last-stmt" type="number" step="0.01" min="0" placeholder="0.00" class="field-input" title="Leave 0 — auto-fills after your first cut-off. Or enter your current statement's Total Amount Due.">
         </div>
         <div id="cc-err" class="text-neg text-xs mb-3"></div>
         <div class="flex gap-3">

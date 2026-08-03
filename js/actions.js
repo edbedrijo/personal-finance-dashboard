@@ -85,6 +85,10 @@ window.txOpenEdit   = id  => {
     showToast(`Edit this from the Goals ${tx.notes==='Goal deposit'?'goal':'loan'} card (delete + re-add)`, 'error');
     return;
   }
+  if (tx && tx.notes==='Loan disbursement') {
+    showToast('Loan proceeds — delete it here to reverse the cash-in, or manage the loan from Goals', 'error');
+    return;
+  }
   txUI.editId=id; txUI.showModal=true; txUI.deleteId=null; render(); setTimeout(()=>document.getElementById('tx-desc')?.focus(),60);
 };
 window.txCloseModal = () => { txUI.showModal=false; txUI.editId=null; render(); };
@@ -238,6 +242,13 @@ window.txConfirmDelete = () => {
   const tx = state.transactions.find(t=>t.id===txUI.deleteId);
   if (tx) {
     if (tx.notes==='CC payment') adjustCCPayment(tx, -1);
+    else if (tx.notes==='Loan disbursement') {
+      // Reverse the cash-in: remove the credited balance, clear the loan's link
+      const dest = state.accounts.find(a=>a.id===tx.toAccountId);
+      if (dest) dest.balance -= tx.amount;
+      const l = state.loans.find(x=>x.id===tx.loanId);
+      if (l && l.disbursement && l.disbursement.txId===tx.id) delete l.disbursement;
+    }
     else if (tx.notes==='Goal deposit'||tx.notes==='Loan payment') {
       // Restore the source account and remove the mirrored deposit/payment record
       const src = state.accounts.find(a=>a.id===tx.accountId);
@@ -311,12 +322,10 @@ window.ccUpdate = id => {
   const icon=document.getElementById('edit-cc-icon-'+id)?.value.trim();
   const lastStmtU=parseFloat(document.getElementById('edit-cc-last-stmt-'+id)?.value);
   const cutoffDayU=parseInt(document.getElementById('edit-cc-cutoff-'+id)?.value);
-  const minDueU=parseFloat(document.getElementById('edit-cc-min-due-'+id)?.value);
   if(name) c.name=name; if(!isNaN(owed)) c.outstanding=owed;
   if(!isNaN(lim)) c.limit=lim; if(!isNaN(due)&&due>=1&&due<=31) c.dueDay=due;
-  if(!isNaN(lastStmtU)) c.lastStatement=lastStmtU;
+  if(!isNaN(lastStmtU)){ c.lastStatement=lastStmtU; c.lastStatementDate=todayISO; }
   if(!isNaN(cutoffDayU)&&cutoffDayU>=1&&cutoffDayU<=31) c.cutoffDay=cutoffDayU;
-  if(!isNaN(minDueU)) c.minDue=minDueU;
   if(icon) c.icon=icon;
   save(); acctUI.editCCId=null; render();
 };
@@ -331,10 +340,9 @@ window.ccSave = () => {
   const due=parseInt(document.getElementById('cc-due')?.value)||25;
   const cutoffDay=parseInt(document.getElementById('cc-cutoff')?.value)||22;
   const lastStmt=parseFloat(document.getElementById('cc-last-stmt')?.value)||0;
-  const minDue=parseFloat(document.getElementById('cc-min-due')?.value)||0;
   const icon=document.getElementById('cc-icon')?.value.trim()||'💳';
   if(!name){document.getElementById('cc-err').textContent='Name is required.';return;}
-  state.creditCards.push({id:'cc_'+Date.now(),name,outstanding:owed,lastStatement:lastStmt,minDue,limit:lim,dueDay:due,cutoffDay:cutoffDay,icon});
+  state.creditCards.push({id:'cc_'+Date.now(),name,outstanding:owed,lastStatement:lastStmt,lastStatementDate:lastStmt>0?todayISO:'',limit:lim,dueDay:due,cutoffDay:cutoffDay,icon});
   save(); acctUI.showAddCC=false; render();
 };
 
@@ -413,6 +421,35 @@ window.ccStatementPayments = id => {
   return (state.transactions||[])
     .filter(t => t.notes==='CC payment' && t.toAccountId===id && t.date>=prevCutoffStr)
     .reduce((s,t)=>s+t.amount,0);
+};
+
+// Auto-snapshot each CC's statement balance once its cutoff has passed.
+// Reconstructs the balance as of the cutoff date so it's correct even when the
+// app is opened days later (outstanding by then includes new-cycle charges):
+//   statement = outstanding - charges after cutoff + payments after cutoff
+// Runs once per session (guarded), and only when the last snapshot predates the
+// most recent cutoff, so a manual edit sticks until the next cutoff.
+let statementsChecked = false;
+window.checkAndSnapshotStatements = () => {
+  if(statementsChecked) return; statementsChecked = true;
+  let changed = false;
+  (state.creditCards||[]).forEach(c => {
+    const dates = ccCycleDates(c.id); if(!dates) return;
+    // The cutoff that most recently passed is the previous cycle's cutoff
+    // (dates.cutoff is the upcoming one). Derive it: day before current cycle start.
+    const prevCutoff = new Date(dates.cycleStart + 'T00:00:00');
+    prevCutoff.setDate(prevCutoff.getDate() - 1);
+    const prevCutoffStr = toLocalISO(prevCutoff);
+    if(prevCutoffStr > todayISO) return; // cutoff not reached yet
+    if(c.lastStatementDate && c.lastStatementDate >= prevCutoffStr) return; // already snapshotted
+    const charged = ccCycleSpend(c.id);            // charges since day-after-cutoff
+    const paid    = ccStatementPayments(c.id);     // payments since cutoff
+    const stmt = Math.max(0, (c.outstanding||0) - charged + paid);
+    c.lastStatement = stmt;
+    c.lastStatementDate = prevCutoffStr;
+    changed = true;
+  });
+  if(changed) save();
 };
 
 // ═══════════════════════════════════════════════════════
@@ -527,7 +564,23 @@ window.loanSave = () => {
   let payment=parseFloat(document.getElementById('loan-payment')?.value);
   if(!name||isNaN(principal)||principal<=0||isNaN(term)||term<=0){document.getElementById('loan-err').textContent='Name, principal, and term are required.';return;}
   if(isNaN(payment)||payment<=0) payment=loanTotals({principal,termMonths:term,monthlyRate:rate,payments:[]}).defaultPayment;
-  state.loans.push({id:'loan_'+Date.now(),name,icon,principal,termMonths:term,monthlyRate:rate,annualEIR:eir,startDate,monthlyPayment:payment,payments:[]});
+  const loanId='loan_'+Date.now();
+  const loan={id:loanId,name,icon,principal,termMonths:term,monthlyRate:rate,annualEIR:eir,startDate,monthlyPayment:payment,payments:[]};
+  // Optional: record the loan proceeds landing in an account. Borrowed cash is
+  // not income (net worth unchanged) — log it as a transfer so it's excluded
+  // from income/expense stats, mirroring how loan payments are handled.
+  const depAcctId=document.getElementById('loan-deposit-acct')?.value||'';
+  if(depAcctId){
+    const dest=state.accounts.find(a=>a.id===depAcctId);
+    if(dest){
+      const txId='tx_'+Date.now();
+      state.transactions.push({ id:txId, date:startDate, description:`${name} — loan proceeds`, type:'transfer',
+        amount:principal, categoryId:'', subcategoryId:'', accountId:'', toAccountId:depAcctId, notes:'Loan disbursement', loanId });
+      dest.balance += principal;
+      loan.disbursement={txId, accountId:depAcctId, amount:principal};
+    }
+  }
+  state.loans.push(loan);
   save(); goalUI.showAddLoan=false; render();
 };
 window.loanUpdate = id => {

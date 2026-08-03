@@ -152,7 +152,7 @@ function migrateState(p) {
     if (!a.icon) a.icon = a.type==='bank' ? '🏦' : a.type==='ewallet' ? '📱' : '💵';
     if (a.maintainingBalance===undefined) a.maintainingBalance=0;
   });
-  if (p.creditCards) p.creditCards.forEach(c => { if (!c.icon) c.icon = '💳'; if (c.lastStatement===undefined) c.lastStatement=0; if (c.maintainingBalance===undefined) c.maintainingBalance=0; if (c.cutoffDay===undefined) c.cutoffDay = c.cycleStartDay ? Math.max(1,c.cycleStartDay-1) : 22; delete c.cycleStartDay; if (c.minDue===undefined) c.minDue=0; });
+  if (p.creditCards) p.creditCards.forEach(c => { if (!c.icon) c.icon = '💳'; if (c.lastStatement===undefined) c.lastStatement=0; if (c.maintainingBalance===undefined) c.maintainingBalance=0; if (c.cutoffDay===undefined) c.cutoffDay = c.cycleStartDay ? Math.max(1,c.cycleStartDay-1) : 22; delete c.cycleStartDay; if (c.lastStatementDate===undefined) c.lastStatementDate = c.lastStatement>0 ? todayISO : ''; delete c.minDue; });
   if (p.recurring) p.recurring.forEach(r => {
     if (r.dueDay !== undefined && !r.frequency) {
       r.frequency = 'monthly'; r.active = true;

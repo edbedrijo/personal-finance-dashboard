@@ -273,6 +273,7 @@ async function initAuth() {
   if (currentUser) {
     await loadFromSupabase(currentUser);
     checkAndPostRecurring();
+    checkAndSnapshotStatements();
   }
   isLoading = false;
   render();
@@ -283,6 +284,7 @@ async function initAuth() {
     if (event === 'SIGNED_IN' && !wasLoggedIn) {
       await loadFromSupabase(currentUser);
       checkAndPostRecurring();
+      checkAndSnapshotStatements();
     }
     render();
   });
