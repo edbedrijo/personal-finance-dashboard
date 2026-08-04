@@ -8,6 +8,7 @@ let acctUI = { showAddAcct:false, addType:'bank', editAcctId:null, deleteAcctId:
 let goalUI = { tab:'goals', showAddGoal:false, editGoalId:null, deleteGoalId:null, depositGoalId:null, expandedGoalId:null, deleteDepositKey:null,
                showAddLoan:false, editLoanId:null, deleteLoanId:null, paymentLoanId:null, expandedLoanId:null, deleteLoanPaymentKey:null };
 let recUI  = { showAddRec:false, editRecId:null, deleteRecId:null };
+let assetUI = { showAddAsset:false, editAssetId:null, deleteAssetId:null };
 let insUI  = { range:makeRange('thisMonth'), showRange:false, trendCatId:'' };
 let iconPickerUI = { targetId:null, anchorRect:null };
 let recAutoPostedCount = 0;
@@ -21,10 +22,12 @@ const fmt  = n => '₱' + Math.round(n).toLocaleString('en-PH');
 const fmt2 = n => '₱' + n.toLocaleString('en-PH', {minimumFractionDigits:2, maximumFractionDigits:2});
 const sfx  = d => d>3&&d<21?'th':{1:'st',2:'nd',3:'rd'}[d%10]||'th';
 const totalAssets    = () => state.accounts.reduce((s,a)=>s+a.balance,0);
+// Non-cash assets (car, property) — count toward net worth but NOT spendable.
+const assetsValue    = () => (state.assets||[]).reduce((s,a)=>s+(a.value||0),0);
 const spendableAssets= () => state.accounts.reduce((s,a)=>s+(a.balance-(a.maintainingBalance||0)),0);
 const totalLiab      = () => state.creditCards.reduce((s,c)=>s+c.outstanding,0)
                            + state.loans.reduce((s,l)=>s+loanTotals(l).remainingPrincipal,0);
-const netWorth       = () => totalAssets()-totalLiab();
+const netWorth       = () => totalAssets()+assetsValue()-totalLiab();
 // Find any account OR credit card by id — used wherever a transaction's accountId may be a CC
 const findAccount = id => state.accounts.find(a=>a.id===id) || state.creditCards.find(c=>c.id===id) || null;
 

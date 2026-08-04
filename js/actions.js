@@ -89,6 +89,10 @@ window.txOpenEdit   = id  => {
     showToast('Loan proceeds — delete it here to reverse the cash-in, or manage the loan from Goals', 'error');
     return;
   }
+  if (tx && tx.notes==='Asset purchase') {
+    showToast('Asset purchase — manage it from the Assets card in Accounts', 'error');
+    return;
+  }
   txUI.editId=id; txUI.showModal=true; txUI.deleteId=null; render(); setTimeout(()=>document.getElementById('tx-desc')?.focus(),60);
 };
 window.txCloseModal = () => { txUI.showModal=false; txUI.editId=null; render(); };
@@ -248,6 +252,13 @@ window.txConfirmDelete = () => {
       if (dest) dest.balance -= tx.amount;
       const l = state.loans.find(x=>x.id===tx.loanId);
       if (l && l.disbursement && l.disbursement.txId===tx.id) delete l.disbursement;
+    }
+    else if (tx.notes==='Asset purchase') {
+      // Reverse the buy: return the cash to the source account, clear the link
+      const src = state.accounts.find(a=>a.id===tx.accountId);
+      if (src) src.balance += tx.amount;
+      const as = (state.assets||[]).find(x=>x.id===tx.assetId);
+      if (as && as.purchase && as.purchase.txId===tx.id) delete as.purchase;
     }
     else if (tx.notes==='Goal deposit'||tx.notes==='Loan payment') {
       // Restore the source account and remove the mirrored deposit/payment record
@@ -478,8 +489,9 @@ window.goalSave = () => {
   const target=parseFloat(document.getElementById('goal-target')?.value);
   const date=document.getElementById('goal-date')?.value;
   const icon=document.getElementById('goal-icon')?.value.trim()||'🎯';
+  const plan=parseFloat(document.getElementById('goal-plan')?.value);
   if(!name||isNaN(target)||!date){document.getElementById('goal-err').textContent='Name, amount, and date are required.';return;}
-  state.goals.push({id:'g_'+Date.now(),name,icon,target,targetDate:date,deposits:[]});
+  state.goals.push({id:'g_'+Date.now(),name,icon,target,targetDate:date,deposits:[],monthlyPlan:(isNaN(plan)||plan<0)?0:plan});
   save(); goalUI.showAddGoal=false; render();
 };
 window.goalUpdate = id => {
@@ -488,7 +500,9 @@ window.goalUpdate = id => {
   const target=parseFloat(document.getElementById('edit-goal-target')?.value);
   const date=document.getElementById('edit-goal-date')?.value;
   const icon=document.getElementById('edit-goal-icon')?.value.trim();
+  const plan=parseFloat(document.getElementById('edit-goal-plan')?.value);
   if(name) g.name=name; if(!isNaN(target)) g.target=target; if(date) g.targetDate=date; if(icon) g.icon=icon;
+  if(!isNaN(plan)&&plan>=0) g.monthlyPlan=plan;
   save(); goalUI.editGoalId=null; render();
 };
 window.goalAddDeposit = id => {
@@ -548,6 +562,63 @@ window.loanConfirmDelete=() => {
   }
   state.loans=state.loans.filter(x=>x.id!==goalUI.deleteLoanId);
   save(); goalUI.deleteLoanId=null; render();
+};
+// ── Forecast cash floor ───────────────────────────────────
+window.setCashFloor = v => { const n=parseFloat(v); state.cashFloor = (isNaN(n)||n<0)?0:n; save(); render(); };
+
+// ── ASSETS (car, property, etc.) ──────────────────────────
+window.assetOpenAdd  = () => { assetUI.showAddAsset=true; assetUI.editAssetId=null; assetUI.deleteAssetId=null; render(); setTimeout(()=>document.getElementById('asset-name')?.focus(),60); };
+window.assetCloseAdd = () => { assetUI.showAddAsset=false; render(); };
+window.assetOpenEdit = id => { assetUI.editAssetId=id; assetUI.showAddAsset=false; assetUI.deleteAssetId=null; render(); };
+window.assetCancelEdit = () => { assetUI.editAssetId=null; render(); };
+window.assetAskDelete = id => { assetUI.deleteAssetId=id; assetUI.editAssetId=null; render(); };
+window.assetCancelDelete = () => { assetUI.deleteAssetId=null; render(); };
+const ASSET_ICONS = { vehicle:'🚗', property:'🏠', other:'📦' };
+window.assetSave = () => {
+  const name = document.getElementById('asset-name')?.value.trim();
+  const type = document.getElementById('asset-type')?.value || 'other';
+  const value = parseFloat(document.getElementById('asset-value')?.value);
+  const payAcctId = document.getElementById('asset-pay-acct')?.value || '';
+  if (!name || isNaN(value) || value<=0) { document.getElementById('asset-err').textContent='Name and a value greater than 0 are required.'; return; }
+  const assetId = 'asset_'+Date.now();
+  const asset = { id:assetId, name, type, icon:ASSET_ICONS[type]||'📦', value, acquiredDate:todayISO };
+  // Optional: buying it moves cash OUT of an account. This is a purchase (asset
+  // swap), NOT an expense — log as a transfer excluded from income/expense stats.
+  if (payAcctId) {
+    const src = state.accounts.find(a=>a.id===payAcctId);
+    if (src) {
+      const txId = 'tx_'+Date.now();
+      state.transactions.push({ id:txId, date:todayISO, description:`${name} — asset purchase`, type:'transfer',
+        amount:value, categoryId:'', subcategoryId:'', accountId:payAcctId, toAccountId:'', notes:'Asset purchase', assetId });
+      src.balance -= value;
+      asset.purchase = { txId, accountId:payAcctId, amount:value };
+    }
+  }
+  state.assets.push(asset);
+  save(); assetUI.showAddAsset=false; render();
+  showToast(`Added ${name}`, 'success');
+};
+window.assetUpdate = id => {
+  const a = (state.assets||[]).find(x=>x.id===id);
+  if (!a) return;
+  const name = document.getElementById('edit-asset-name-'+id)?.value.trim();
+  const type = document.getElementById('edit-asset-type-'+id)?.value;
+  const value = parseFloat(document.getElementById('edit-asset-value-'+id)?.value);
+  if (name) a.name = name;
+  if (type) { a.type = type; a.icon = ASSET_ICONS[type]||a.icon; }
+  if (!isNaN(value) && value>=0) a.value = value;
+  save(); assetUI.editAssetId=null; render();
+};
+window.assetConfirmDelete = () => {
+  const a = (state.assets||[]).find(x=>x.id===assetUI.deleteAssetId);
+  // If it was bought from an account, return that cash and remove the purchase tx.
+  if (a && a.purchase) {
+    const src = state.accounts.find(x=>x.id===a.purchase.accountId);
+    if (src) src.balance += a.purchase.amount;
+    state.transactions = state.transactions.filter(t=>t.id!==a.purchase.txId);
+  }
+  state.assets = (state.assets||[]).filter(x=>x.id!==assetUI.deleteAssetId);
+  save(); assetUI.deleteAssetId=null; render();
 };
 window.loanToggleHistory=id => { goalUI.expandedLoanId=goalUI.expandedLoanId===id?null:id; goalUI.paymentLoanId=null; render(); };
 window.loanOpenPayment= id => { goalUI.paymentLoanId=id; goalUI.expandedLoanId=null; render(); setTimeout(()=>document.getElementById('pay-amt-'+id)?.focus(),60); };

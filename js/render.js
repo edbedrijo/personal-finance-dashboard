@@ -401,7 +401,7 @@ function renderDashboard() {
       </div>`;
   }
 
-  const nw=netWorth(), assets=totalAssets(), spendable=spendableAssets(), liab=totalLiab();
+  const nw=netWorth(), assets=totalAssets(), assetsVal=assetsValue(), spendable=spendableAssets(), liab=totalLiab();
   const m=getMonthlyData();
   const net=m.income-m.expenses;
   const incomeW=Math.min((m.income/Math.max(m.income,m.expenses))*100,100);
@@ -439,11 +439,54 @@ function renderDashboard() {
     const dates = ccCycleDates(c.id);
     return dates && dates.due >= todayISO && dates.due <= forecastEnd;
   }).reduce((s,c)=>s+ccDueAmount(c),0);
-  const available=spendable+forecastIncome-forecastExpense-ccForecastExp;
-  // Stricter bottom line: subtract EVERY unpaid CC due, even outside the window —
-  // that money is already spoken for, whatever the window says.
+  // Loan monthly payments — same treatment as CC dues. Loans store no due-day, so
+  // derive it from the start date's day-of-month; skip fully-paid loans.
+  const loanNextDue = l => {
+    const day = new Date(l.startDate+'T00:00:00').getDate();
+    const d = new Date(now.getFullYear(), now.getMonth(), day);
+    let due = toLocalISO(d);
+    if (due < todayISO) { d.setMonth(d.getMonth()+1); due = toLocalISO(d); }
+    return due;
+  };
+  const loanDueForecast = (state.loans||[])
+    .map(l=>({l, t:loanTotals(l)}))
+    .filter(x=>x.t.paymentsLeft>0)
+    .map(x=>({l:x.l, amount:x.t.monthlyPayment, due:loanNextDue(x.l)}));
+  const loanForecastExp = loanDueForecast
+    .filter(x=>x.due>=todayISO && x.due<=forecastEnd)
+    .reduce((s,x)=>s+x.amount,0);
+  const allLoanDue = loanDueForecast.reduce((s,x)=>s+x.amount,0);
+  // Projected everyday (non-scheduled) CASH spending across the window. Two things
+  // are already counted elsewhere and must be excluded to avoid double-counting:
+  //   1. Expenses charged to a credit card → captured by the CC due line above.
+  //   2. Recurring bills → itemized under Scheduled Expenses above.
+  // So the burn base here is cash-paid, non-recurring expenses only.
+  const freqToMonthly = {daily:30, weekly:4.3333, biweekly:2.1667, monthly:1, quarterly:1/3, yearly:1/12};
+  const ccIds = new Set((state.creditCards||[]).map(c=>c.id));
+  const autoAvgCashExp = (() => {
+    const months = [];
+    for (let i=1; i<=3; i++) {
+      const mo = (now.getMonth()-i+12)%12, yr = now.getMonth()-i<0?now.getFullYear()-1:now.getFullYear();
+      const sum = (state.transactions||[]).filter(t=>{ const d=new Date(t.date+'T00:00:00'); return t.type==='expense'&&!ccIds.has(t.accountId)&&d.getFullYear()===yr&&d.getMonth()===mo; }).reduce((s,t)=>s+t.amount,0);
+      if (sum>0) months.push(sum);
+    }
+    return months.length>0 ? months.reduce((a,b)=>a+b,0)/months.length : 0;
+  })();
+  const monthlyRecurringCashExp = (state.recurring||[])
+    .filter(r=>r.type==='expense'&&r.active&&!ccIds.has(r.accountId))
+    .reduce((s,r)=>s+r.amount*(freqToMonthly[r.frequency]||1),0);
+  const variableDaily = Math.max(0, autoAvgCashExp - monthlyRecurringCashExp)/30;
+  const projectedVariable = variableDaily * (state.forecastDays||7);
+  // Planned monthly goal savings, prorated to the window — money you intend to set
+  // aside isn't free to spend.
+  const plannedSavings = (state.goals||[]).reduce((s,g)=>s+(g.monthlyPlan||0),0) * (state.forecastDays||7)/30;
+  // Personal cash floor: a buffer you never want to dip below.
+  const cashFloor = state.cashFloor||0;
+  const available=spendable+forecastIncome-forecastExpense-ccForecastExp-loanForecastExp-projectedVariable-plannedSavings-cashFloor;
+  // Stricter bottom line: subtract EVERY unpaid CC due and next loan payment, even
+  // outside the window — that money is already spoken for, whatever the window says.
   const allCCDue=ccDueForecast.reduce((s,c)=>s+ccDueAmount(c),0);
-  const afterAllCC=spendable+forecastIncome-forecastExpense-allCCDue;
+  const afterAllCC=spendable+forecastIncome-forecastExpense-allCCDue-allLoanDue-projectedVariable-plannedSavings-cashFloor;
   const healthRatio=spendable>0?afterAllCC/spendable:(afterAllCC>=0?1:-1);
   const weather=afterAllCC<0
     ? {icon:'⛈️', label:'Stormy', note:'Obligations exceed your available funds'}
@@ -455,6 +498,7 @@ function renderDashboard() {
   const upcomingBills=[
     ...(state.recurring||[]).filter(r=>r.active&&r.type==='expense'&&r.nextDue<=next7).map(r=>({icon:r.icon||'🔁',name:r.name,date:r.nextDue,amount:r.amount})),
     ...ccDueForecast.map(c=>({icon:'💳',name:c.name,date:ccCycleDates(c.id)?.due,amount:ccDueAmount(c)})).filter(b=>b.date&&b.date<=next7),
+    ...loanDueForecast.map(x=>({icon:x.l.icon||'🏦',name:x.l.name,date:x.due,amount:x.amount})).filter(b=>b.date&&b.date<=next7),
   ].sort((a,b)=>a.date.localeCompare(b.date));
   // Compute vs Last Month dynamically
   const curMo=now.getMonth(), curYr=now.getFullYear();
@@ -472,7 +516,7 @@ function renderDashboard() {
       </div>
       <div class="text-5xl font-bold tracking-tight mb-5">${maskAmt(fmt2(nw))}</div>
       <div class="flex gap-10">
-        <div><div class="text-xs font-medium mb-0.5" style="color:rgba(28,25,23,0.8)">Assets</div><div class="text-lg font-semibold">${maskAmt(fmt2(assets))}</div></div>
+        <div><div class="text-xs font-medium mb-0.5" style="color:rgba(28,25,23,0.8)">Assets</div><div class="text-lg font-semibold">${maskAmt(fmt2(assets+assetsVal))}</div></div>
         <div><div class="text-xs font-medium mb-0.5" style="color:rgba(28,25,23,0.8)">Liabilities</div><div class="text-lg font-semibold">${maskAmt(fmt2(liab))}</div></div>
       </div>
       ${spendable!==assets?`<div style="margin-top:14px;padding-top:12px;border-top:1px solid rgba(28,25,23,0.25);display:flex;justify-content:space-between;align-items:center"><div class="text-xs font-medium" style="color:rgba(28,25,23,0.8)">Spendable (excl. maintaining bal.)</div><div class="text-sm font-bold">${maskAmt(fmt2(spendable))}</div></div>`:''}
@@ -563,10 +607,20 @@ function renderDashboard() {
       <div class="text-xs text-dimmer font-semibold tracking-wider mt-4 mb-2">SCHEDULED INCOME</div>
       ${forecastItems.income.length===0?`<div class="text-xs text-dimmer py-1.5">None in this window</div>`:forecastItems.income.map(r=>`<div class="flex justify-between items-center py-1.5"><div class="text-sm flex items-center gap-2"><span>${r.icon}</span>${r.name}</div><div class="text-sm ${r.amount===0?'text-dimmer':'text-pos'}">${r.amount===0?'—':'+ '+fmt(r.amount)}</div></div>`).join('')}
       <div class="text-xs text-dimmer font-semibold tracking-wider mt-4 mb-2">SCHEDULED EXPENSES</div>
-      ${forecastItems.expense.length===0&&ccForecastExp===0?`<div class="text-xs text-dimmer py-1.5">None in this window</div>`:forecastItems.expense.map(r=>`<div class="flex justify-between items-center py-1.5"><div class="text-sm flex items-center gap-2"><span>${r.icon}</span>${r.name}</div><div class="text-sm text-neg">− ${fmt(r.amount)}</div></div>`).join('')}
+      ${forecastItems.expense.length===0&&ccForecastExp===0&&allLoanDue===0?`<div class="text-xs text-dimmer py-1.5">None in this window</div>`:forecastItems.expense.map(r=>`<div class="flex justify-between items-center py-1.5"><div class="text-sm flex items-center gap-2"><span>${r.icon}</span>${r.name}</div><div class="text-sm text-neg">− ${fmt(r.amount)}</div></div>`).join('')}
       ${ccDueForecast.map(c=>{ const dates=ccCycleDates(c.id); const inWindow=dates&&dates.due<=forecastEnd; return `<div class="flex justify-between items-center py-1.5"><div class="text-sm flex items-center gap-2"><span>💳</span>${c.name}<span class="text-xs ml-1" style="color:${inWindow?'var(--amber)':'var(--text-3)'}">due ${dates?fmtDateShort(dates.due):'—'}${inWindow?'':' · outside window'}</span></div><div class="text-sm" style="color:${inWindow?'var(--red)':'var(--text-3)'}">− ${fmt(ccDueAmount(c))}</div></div>`; }).join('')}
+      ${loanDueForecast.map(x=>{ const inWindow=x.due<=forecastEnd; return `<div class="flex justify-between items-center py-1.5"><div class="text-sm flex items-center gap-2"><span>${x.l.icon||'🏦'}</span>${x.l.name}<span class="text-xs ml-1" style="color:${inWindow?'var(--amber)':'var(--text-3)'}">due ${fmtDateShort(x.due)}${inWindow?'':' · outside window'}</span></div><div class="text-sm" style="color:${inWindow?'var(--red)':'var(--text-3)'}">− ${fmt(x.amount)}</div></div>`; }).join('')}
+      ${projectedVariable>0?`<div class="text-xs text-dimmer font-semibold tracking-wider mt-4 mb-2">EVERYDAY SPENDING (projected)</div>
+      <div class="flex justify-between items-center py-1.5"><div class="text-sm flex items-center gap-2"><span>🔥</span>Est. daily spend<span class="text-xs ml-1" style="color:var(--text-3)">${fmt(variableDaily)}/day × ${state.forecastDays||7}d</span></div><div class="text-sm text-neg">− ${fmt(projectedVariable)}</div></div>`:''}
+      ${plannedSavings>0||cashFloor>0?`<div class="text-xs text-dimmer font-semibold tracking-wider mt-4 mb-2">SET ASIDE</div>`:''}
+      ${plannedSavings>0?`<div class="flex justify-between items-center py-1.5"><div class="text-sm flex items-center gap-2"><span>🎯</span>Planned savings<span class="text-xs ml-1" style="color:var(--text-3)">for goals</span></div><div class="text-sm text-neg">− ${fmt(plannedSavings)}</div></div>`:''}
+      ${cashFloor>0?`<div class="flex justify-between items-center py-1.5"><div class="text-sm flex items-center gap-2"><span>🛡️</span>Cash buffer</div><div class="text-sm text-neg">− ${fmt(cashFloor)}</div></div>`:''}
+      <div class="flex items-center justify-between py-1.5 mt-1">
+        <div class="text-xs" style="color:var(--text-3)">🛡️ Keep a buffer of</div>
+        <div class="flex items-center gap-1"><span class="text-xs" style="color:var(--text-3)">₱</span><input id="cash-floor-input" type="number" step="100" value="${cashFloor}" onchange="setCashFloor(this.value)" class="field-input" style="width:110px;padding:4px 8px;font-size:13px;text-align:right"></div>
+      </div>
       <div class="flex justify-between items-center pt-4 mt-3 border-t border-line"><span class="text-sm" style="color:var(--text-2)">Available to spend <span class="text-xs text-dimmer">(this window)</span></span><span class="font-semibold ${available>=0?'text-pos':'text-neg'}">${fmt2(available)}</span></div>
-      <div class="flex justify-between items-center pt-2.5"><span class="font-semibold">After all CC dues <span class="text-xs text-dimmer font-normal">(safe to spend)</span></span><span class="text-lg font-bold ${afterAllCC>=0?'text-pos':'text-neg'}">${fmt2(afterAllCC)}</span></div>
+      <div class="flex justify-between items-center pt-2.5"><span class="font-semibold">After all dues <span class="text-xs text-dimmer font-normal">(safe to spend)</span></span><span class="text-lg font-bold ${afterAllCC>=0?'text-pos':'text-neg'}">${fmt2(afterAllCC)}</span></div>
     </div>
     <div class="bg-surface rounded-2xl p-5 mb-4">
       <div class="flex items-center gap-2 mb-4"><span>🎯</span><span class="font-semibold">Financial Goals</span></div>
@@ -922,6 +976,7 @@ function renderGoals() {
           <div><div class="field-label">TARGET (₱) *</div><input id="goal-target" type="number" step="0.01" min="0" placeholder="0.00" class="field-input"></div>
           <div><div class="field-label">TARGET DATE *</div><input id="goal-date" type="date" class="field-input"></div>
         </div>
+        <div class="mb-5"><div class="field-label">MONTHLY SAVINGS PLAN (₱)</div><input id="goal-plan" type="number" step="0.01" min="0" placeholder="0.00" class="field-input"><div class="text-xs mt-1" style="color:var(--text-3)">Optional — reserved from your forecast's "safe to spend".</div></div>
         <div id="goal-err" class="text-neg text-xs mb-3"></div>
         <div class="flex gap-3">
           <button onclick="goalSave()" class="flex-1 rounded-xl py-3 font-semibold text-white text-sm" style="background:var(--accent);border:none;cursor:pointer">Create Goal</button>
@@ -946,6 +1001,7 @@ function renderGoals() {
           <div><div class="field-label">TARGET (₱) *</div><input id="edit-goal-target" type="number" step="0.01" value="${editGoal.target}" class="field-input"></div>
           <div><div class="field-label">TARGET DATE *</div><input id="edit-goal-date" type="date" value="${editGoal.targetDate}" class="field-input"></div>
         </div>
+        <div class="mb-5"><div class="field-label">MONTHLY SAVINGS PLAN (₱)</div><input id="edit-goal-plan" type="number" step="0.01" min="0" value="${editGoal.monthlyPlan||0}" class="field-input"><div class="text-xs mt-1" style="color:var(--text-3)">Optional — reserved from your forecast's "safe to spend".</div></div>
         <div class="flex gap-3">
           <button onclick="goalUpdate('${editGoal.id}')" class="flex-1 rounded-xl py-3 font-semibold text-white text-sm" style="background:var(--accent);border:none;cursor:pointer">Save Changes</button>
           <button onclick="goalCancelEdit()" class="flex-1 rounded-xl py-3 text-sm" style="background:var(--surface2);border:1px solid var(--border);color:var(--text-2);cursor:pointer">Cancel</button>
@@ -1171,7 +1227,7 @@ function renderAccounts() {
   const sumB=banks.reduce((s,a)=>s+a.balance,0), sumE=ewallets.reduce((s,a)=>s+a.balance,0), sumC=cashList.reduce((s,a)=>s+a.balance,0);
   // Hero uses the shared netWorth()/totalLiab() (incl. loans) so it matches Home.
   // totalOwed stays CC-only — it's reused for the Credit Cards section header below.
-  const totalDebit=sumB+sumE+sumC, totalOwed=state.creditCards.reduce((s,c)=>s+c.outstanding,0), heroLiab=totalLiab(), nw=netWorth();
+  const totalDebit=sumB+sumE+sumC, totalOwed=state.creditCards.reduce((s,c)=>s+c.outstanding,0), heroLiab=totalLiab(), nw=netWorth(), assetsVal=assetsValue();
   const totalMaintaining=state.accounts.reduce((s,a)=>s+(a.maintainingBalance||0),0);
   const totalSpendable=totalDebit-totalMaintaining;
 
@@ -1232,6 +1288,78 @@ function renderAccounts() {
         </div>
         ${list.map(a=>acctCard(a)).join('')}
         ${list.length===0?`<div class="text-center py-4 text-sm" style="color:var(--text-3)">No ${title.toLowerCase()} added yet</div>`:''}
+      </div>`;
+  }
+
+  const ASSET_ICON = { vehicle:'🚗', property:'🏠', other:'📦' };
+  function assetCard(a) {
+    if (assetUI.deleteAssetId===a.id) return `
+      <div class="rounded-xl p-4 mb-2" style="background:var(--danger-surface);border:1px solid var(--danger-border)">
+        <div class="text-sm mb-3" style="color:var(--danger-text)">Delete <strong>${a.name}</strong>? ${a.purchase?'The cash paid from your account will be returned.':'This cannot be undone.'}</div>
+        <div class="flex gap-2">
+          <button onclick="assetConfirmDelete()" class="text-xs px-4 py-2 rounded-lg font-semibold" style="background:var(--red-strong);border:none;color:#fff;cursor:pointer">Delete</button>
+          <button onclick="assetCancelDelete()" class="text-xs px-4 py-2 rounded-lg" style="background:var(--btn-ghost);border:none;color:var(--text-2);cursor:pointer">Cancel</button>
+        </div>
+      </div>`;
+    if (assetUI.editAssetId===a.id) return `
+      <div class="rounded-xl p-4 mb-2" style="background:var(--surface2);border:1px solid var(--accent)">
+        <div class="grid grid-cols-2 gap-3 mb-3">
+          <div><div class="field-label">NAME</div><input id="edit-asset-name-${a.id}" value="${a.name}" class="field-input"></div>
+          <div><div class="field-label">TYPE</div><select id="edit-asset-type-${a.id}" class="field-input">${Object.keys(ASSET_ICON).map(t=>`<option value="${t}" ${a.type===t?'selected':''}>${ASSET_ICON[t]} ${t.charAt(0).toUpperCase()+t.slice(1)}</option>`).join('')}</select></div>
+        </div>
+        <div class="mb-3"><div class="field-label">CURRENT VALUE (₱)</div><input id="edit-asset-value-${a.id}" type="number" step="0.01" value="${a.value}" class="field-input"></div>
+        <div class="flex gap-2">
+          <button onclick="assetUpdate('${a.id}')" class="flex-1 rounded-lg py-2 text-sm font-semibold text-white" style="background:var(--accent);border:none;cursor:pointer">Save</button>
+          <button onclick="assetCancelEdit()" class="flex-1 rounded-lg py-2 text-sm" style="background:var(--btn-ghost);border:none;color:var(--text-2);cursor:pointer">Cancel</button>
+        </div>
+      </div>`;
+    return `
+      <div class="flex items-center gap-3 p-3 rounded-xl mb-2" style="background:var(--surface2)">
+        <div class="flex-shrink-0 flex items-center justify-center rounded-xl text-xl" style="width:42px;height:42px;background:var(--bg)">${a.icon||ASSET_ICON[a.type]||'📦'}</div>
+        <div class="flex-1 min-w-0">
+          <div class="text-sm font-semibold" style="color:var(--text)">${a.name}</div>
+          <div class="text-xs" style="color:var(--text-3)">${(a.type||'other').charAt(0).toUpperCase()+(a.type||'other').slice(1)}${a.purchase?' · bought':''}</div>
+        </div>
+        <div class="font-semibold text-sm flex-shrink-0">${fmt2(a.value)}</div>
+        <div class="flex gap-1 flex-shrink-0">
+          <button onclick="assetOpenEdit('${a.id}')" style="background:var(--surface);border:none;color:var(--text-2);cursor:pointer;border-radius:8px;padding:5px 8px;font-size:13px">✏️</button>
+          <button onclick="assetAskDelete('${a.id}')" style="background:var(--surface);border:none;color:var(--text-2);cursor:pointer;border-radius:8px;padding:5px 8px;font-size:13px">🗑️</button>
+        </div>
+      </div>`;
+  }
+
+  function assetsSection() {
+    const list = state.assets||[];
+    const cashAccts = state.accounts;
+    const addForm = assetUI.showAddAsset ? `
+      <div class="rounded-xl p-4 mb-2" style="background:var(--surface2);border:1px solid var(--accent)">
+        <div class="grid grid-cols-2 gap-3 mb-3">
+          <div><div class="field-label">NAME</div><input id="asset-name" placeholder="e.g. Honda Civic" class="field-input"></div>
+          <div><div class="field-label">TYPE</div><select id="asset-type" class="field-input">${Object.keys(ASSET_ICON).map(t=>`<option value="${t}">${ASSET_ICON[t]} ${t.charAt(0).toUpperCase()+t.slice(1)}</option>`).join('')}</select></div>
+        </div>
+        <div class="mb-3"><div class="field-label">VALUE (₱)</div><input id="asset-value" type="number" step="0.01" placeholder="0.00" class="field-input"></div>
+        <div class="mb-3"><div class="field-label">PAID FROM (optional)</div><select id="asset-pay-acct" class="field-input"><option value="">— Not from an account (already owned) —</option>${cashAccts.map(a=>`<option value="${a.id}">${a.name} (${fmt(a.balance)})</option>`).join('')}</select><div class="text-xs mt-1" style="color:var(--text-3)">If chosen, the value is moved out of that account as a purchase (not an expense).</div></div>
+        <div id="asset-err" class="text-neg text-xs mb-2"></div>
+        <div class="flex gap-2">
+          <button onclick="assetSave()" class="flex-1 rounded-lg py-2 text-sm font-semibold text-white" style="background:var(--accent);border:none;cursor:pointer">Add Asset</button>
+          <button onclick="assetCloseAdd()" class="flex-1 rounded-lg py-2 text-sm" style="background:var(--btn-ghost);border:none;color:var(--text-2);cursor:pointer">Cancel</button>
+        </div>
+      </div>` : '';
+    return `
+      <div class="rounded-2xl p-4 mb-4" style="background:var(--surface)">
+        <div class="flex items-center justify-between mb-3">
+          <div class="flex items-center gap-2">
+            <span>🚗</span><span class="font-semibold">Assets</span>
+            <span class="text-xs px-2 py-0.5 rounded-full font-medium" style="background:var(--amber-dim);color:var(--amber)">${list.length}</span>
+          </div>
+          <div class="flex items-center gap-3">
+            <span class="text-sm font-semibold" style="color:var(--text-2)">${fmt2(assetsValue())}</span>
+            <button onclick="assetOpenAdd()" class="text-xs px-3 py-1.5 rounded-lg font-semibold text-white" style="background:var(--accent);border:none;cursor:pointer">+ Add</button>
+          </div>
+        </div>
+        ${addForm}
+        ${list.map(a=>assetCard(a)).join('')}
+        ${list.length===0&&!assetUI.showAddAsset?`<div class="text-center py-4 text-sm" style="color:var(--text-3)">No assets tracked yet (car, property, etc.)</div>`:''}
       </div>`;
   }
 
@@ -1383,7 +1511,7 @@ function renderAccounts() {
 
         <!-- Balance Grid -->
         <div class="grid grid-cols-2 gap-2 mb-3">
-          <div class="rounded-lg p-3" style="background:var(--surface);${c.lastStatement>0?'grid-column:span 2':''};${c.lastStatement>0?'':''}">
+          <div class="rounded-lg p-3" style="background:var(--surface)">
             <div class="text-xs mb-1" style="color:var(--text-3)">Statement Balance</div>
             ${c.lastStatement>0?`
             <div class="flex items-start justify-between">
@@ -1497,7 +1625,7 @@ function renderAccounts() {
       </div>
       <div class="text-4xl font-bold mb-4">${maskAmt(fmt2(nw))}</div>
       <div class="grid grid-cols-2 gap-4">
-        <div><div class="text-xs font-medium mb-1" style="color:rgba(28,25,23,0.8)">Total Assets</div><div class="text-lg font-semibold">${maskAmt(fmt2(totalDebit))}</div></div>
+        <div><div class="text-xs font-medium mb-1" style="color:rgba(28,25,23,0.8)">Total Assets</div><div class="text-lg font-semibold">${maskAmt(fmt2(totalDebit+assetsVal))}</div></div>
         <div><div class="text-xs font-medium mb-1" style="color:rgba(28,25,23,0.8)">Total Owed</div><div class="text-lg font-semibold">${maskAmt(fmt2(heroLiab))}</div></div>
       </div>
       ${totalMaintaining>0?`<div style="margin-top:12px;padding-top:12px;border-top:1px solid rgba(28,25,23,0.25);display:flex;justify-content:space-between;align-items:center"><div class="text-xs font-medium" style="color:rgba(28,25,23,0.8)">Spendable (excl. maintaining bal.)</div><div style="font-size:14px;font-weight:700;color:var(--on-accent)">${maskAmt(fmt2(totalSpendable))}</div></div>`:''}
@@ -1505,6 +1633,7 @@ function renderAccounts() {
     ${section('Banks', banks, 'bank', sumB)}
     ${section('E-Wallets', ewallets, 'ewallet', sumE)}
     ${section('Cash', cashList, 'cash', sumC)}
+    ${assetsSection()}
     <div class="rounded-2xl p-4 mb-4" style="background:var(--surface)">
       <div class="flex items-center justify-between mb-3">
         <div class="flex items-center gap-2">

@@ -130,6 +130,8 @@ const defaultState = {
   recurring:    [],
   goals:        [],
   loans:        [],
+  assets:       [],
+  cashFloor:    0,
   forecastDays: 7,
   categories:   defaultCategories,
   transactions: [],
@@ -146,6 +148,8 @@ function migrateState(p) {
   if (!Array.isArray(p.recurring))    p.recurring    = [];
   if (!Array.isArray(p.goals))        p.goals        = [];
   if (!Array.isArray(p.loans))        p.loans        = [];
+  if (!Array.isArray(p.assets))       p.assets       = [];
+  if (typeof p.cashFloor !== 'number') p.cashFloor   = 0;
   if (p.transactions) p.transactions.forEach(t => { if (t.toAccountId===undefined) t.toAccountId=''; });
   if (p.accounts) p.accounts.forEach(a => {
     if (!a.type) a.type = ['gcash','maya'].includes(a.id) ? 'ewallet' : a.id==='cash' ? 'cash' : 'bank';
@@ -186,6 +190,7 @@ function migrateState(p) {
     }
     delete g.linkedCategoryId; delete g.linkedSubcategoryId;
     delete g.status;
+    if (typeof g.monthlyPlan !== 'number') g.monthlyPlan = 0;
   });
   if (p.loans) p.loans.forEach(l => { if (!Array.isArray(l.payments)) l.payments = []; });
   // Fix legacy CC payment transactions recorded as expense — should be transfer
