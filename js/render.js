@@ -442,10 +442,15 @@ function renderDashboard() {
   // Loan monthly payments — same treatment as CC dues. Loans store no due-day, so
   // derive it from the start date's day-of-month; skip fully-paid loans.
   const loanNextDue = l => {
-    const day = new Date(l.startDate+'T00:00:00').getDate();
-    const d = new Date(now.getFullYear(), now.getMonth(), day);
+    const start = l.startDate || todayISO;
+    // Never schedule a payment before the loan starts — for a future-dated loan the
+    // floor is its start date, otherwise today.
+    const floor = start > todayISO ? start : todayISO;
+    const day = new Date(start+'T00:00:00').getDate();
+    const fd = new Date(floor+'T00:00:00');
+    const d = new Date(fd.getFullYear(), fd.getMonth(), day);
     let due = toLocalISO(d);
-    if (due < todayISO) { d.setMonth(d.getMonth()+1); due = toLocalISO(d); }
+    if (due < floor) { d.setMonth(d.getMonth()+1); due = toLocalISO(d); }
     return due;
   };
   const loanDueForecast = (state.loans||[])
