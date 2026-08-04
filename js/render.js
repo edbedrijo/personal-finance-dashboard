@@ -1169,7 +1169,9 @@ function renderAccounts() {
   const ewallets = state.accounts.filter(a=>a.type==='ewallet');
   const cashList = state.accounts.filter(a=>a.type==='cash');
   const sumB=banks.reduce((s,a)=>s+a.balance,0), sumE=ewallets.reduce((s,a)=>s+a.balance,0), sumC=cashList.reduce((s,a)=>s+a.balance,0);
-  const totalDebit=sumB+sumE+sumC, totalOwed=state.creditCards.reduce((s,c)=>s+c.outstanding,0), nw=totalDebit-totalOwed;
+  // Hero uses the shared netWorth()/totalLiab() (incl. loans) so it matches Home.
+  // totalOwed stays CC-only — it's reused for the Credit Cards section header below.
+  const totalDebit=sumB+sumE+sumC, totalOwed=state.creditCards.reduce((s,c)=>s+c.outstanding,0), heroLiab=totalLiab(), nw=netWorth();
   const totalMaintaining=state.accounts.reduce((s,a)=>s+(a.maintainingBalance||0),0);
   const totalSpendable=totalDebit-totalMaintaining;
 
@@ -1496,7 +1498,7 @@ function renderAccounts() {
       <div class="text-4xl font-bold mb-4">${maskAmt(fmt2(nw))}</div>
       <div class="grid grid-cols-2 gap-4">
         <div><div class="text-xs font-medium mb-1" style="color:rgba(28,25,23,0.8)">Total Assets</div><div class="text-lg font-semibold">${maskAmt(fmt2(totalDebit))}</div></div>
-        <div><div class="text-xs font-medium mb-1" style="color:rgba(28,25,23,0.8)">Total Owed</div><div class="text-lg font-semibold">${maskAmt(fmt2(totalOwed))}</div></div>
+        <div><div class="text-xs font-medium mb-1" style="color:rgba(28,25,23,0.8)">Total Owed</div><div class="text-lg font-semibold">${maskAmt(fmt2(heroLiab))}</div></div>
       </div>
       ${totalMaintaining>0?`<div style="margin-top:12px;padding-top:12px;border-top:1px solid rgba(28,25,23,0.25);display:flex;justify-content:space-between;align-items:center"><div class="text-xs font-medium" style="color:rgba(28,25,23,0.8)">Spendable (excl. maintaining bal.)</div><div style="font-size:14px;font-weight:700;color:var(--on-accent)">${maskAmt(fmt2(totalSpendable))}</div></div>`:''}
     </div>
