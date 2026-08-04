@@ -647,8 +647,9 @@ window.loanSave = () => {
   let payment=parseFloat(document.getElementById('loan-payment')?.value);
   if(!name||isNaN(principal)||principal<=0||isNaN(term)||term<=0){document.getElementById('loan-err').textContent='Name, principal, and term are required.';return;}
   if(isNaN(payment)||payment<=0) payment=loanTotals({principal,termMonths:term,monthlyRate:rate,payments:[]}).defaultPayment;
+  const cardId=document.getElementById('loan-card')?.value||'';
   const loanId='loan_'+Date.now();
-  const loan={id:loanId,name,icon,principal,termMonths:term,monthlyRate:rate,annualEIR:eir,startDate,monthlyPayment:payment,payments:[]};
+  const loan={id:loanId,name,icon,principal,termMonths:term,monthlyRate:rate,annualEIR:eir,startDate,monthlyPayment:payment,payments:[],cardId};
   // Optional: record the loan proceeds landing in an account. Borrowed cash is
   // not income (net worth unchanged) — log it as a transfer so it's excluded
   // from income/expense stats, mirroring how loan payments are handled.
@@ -683,6 +684,7 @@ window.loanUpdate = id => {
   if(!isNaN(eir)) l.annualEIR=eir;
   if(startDate) l.startDate=startDate;
   if(!isNaN(payment)&&payment>0) l.monthlyPayment=payment;
+  const cardEl=document.getElementById('edit-loan-card'); if(cardEl) l.cardId=cardEl.value;
   save(); goalUI.editLoanId=null; render();
 };
 window.loanAddPayment = id => {

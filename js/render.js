@@ -526,10 +526,11 @@ function renderDashboard() {
       <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-3">
         ${state.accounts.map(a=>`<div class="rounded-xl p-4 cursor-pointer" style="background:var(--bg)" onclick="setView('accounts')"><div class="flex items-center gap-2 mb-2"><div style="width:24px;height:24px;border-radius:7px;overflow:hidden;flex-shrink:0;font-size:14px;display:flex;align-items:center;justify-content:center">${brandBadge(a.name, a.icon||'')}</div><div class="text-xs text-dim truncate">${a.name}</div></div><div class="text-lg font-semibold">${editable(a.balance,`accounts.${a.id}.balance`,fmt)}</div></div>`).join('')}
       </div>
-      <div class="flex items-center justify-between mb-3 mt-5 pt-4 border-t border-line"><div class="section-label">CREDIT CARDS</div><div class="text-xs text-neg font-medium">OWED ${fmt2(liab)}</div></div>
+      <div class="flex items-center justify-between mb-3 mt-5 pt-4 border-t border-line"><div class="section-label">CREDIT CARDS</div><div class="text-xs text-neg font-medium">OWED ${fmt2(state.creditCards.reduce((s,c)=>s+c.outstanding,0))}</div></div>
       <div class="space-y-3">
         ${state.creditCards.map(c=>{
-          const avail=c.limit-c.outstanding, pct=c.limit>0?Math.min((Math.max(c.outstanding,0)/c.limit)*100,100):0;
+          const blockedCredit=(state.loans||[]).filter(l=>l.cardId===c.id).reduce((s,l)=>s+loanTotals(l).remainingPrincipal,0);
+          const avail=c.limit-c.outstanding-blockedCredit, pct=c.limit>0?Math.min(((Math.max(c.outstanding,0)+blockedCredit)/c.limit)*100,100):0;
           return `<div class="rounded-xl p-4 cursor-pointer" style="background:var(--bg)" onclick="setView('accounts')">
             <div class="flex justify-between items-start mb-3">
               <div class="flex items-center gap-3"><div style="width:32px;height:32px;border-radius:9px;overflow:hidden;flex-shrink:0;font-size:18px;display:flex;align-items:center;justify-content:center">${brandBadge(c.name, c.icon||'💳')}</div><div><div class="font-medium">${c.name}</div><div class="text-xs text-dim mt-0.5">${(()=>{const dd=ccCycleDates(c.id);return dd?`Due ${fmtDateShort(dd.due)} · ${dd.daysToDue} days away`:`Due ${c.dueDay}${sfx(c.dueDay)}`})()}</div></div></div>
@@ -1076,7 +1077,7 @@ function renderGoals() {
         <div class="flex items-start justify-between mb-4">
           <div>
             <div class="flex items-center gap-2 text-lg font-bold">${l.icon} ${l.name}</div>
-            <div class="text-xs mt-0.5" style="color:var(--text-3)">${fmt(l.principal)} principal · ${l.termMonths} months${l.monthlyRate?` · ${l.monthlyRate}%/mo add-on`:''}${l.annualEIR?` · ${l.annualEIR}% EIR p.a.`:''}</div>
+            <div class="text-xs mt-0.5" style="color:var(--text-3)">${fmt(l.principal)} principal · ${l.termMonths} months${l.monthlyRate?` · ${l.monthlyRate}%/mo add-on`:''}${l.annualEIR?` · ${l.annualEIR}% EIR p.a.`:''}${l.cardId?` · 💳 ${state.creditCards.find(c=>c.id===l.cardId)?.name||'card'}`:''}</div>
           </div>
           <div class="flex gap-1 flex-shrink-0">
             <button onclick="loanOpenEdit('${l.id}')" style="background:var(--surface2);border:none;color:var(--text-2);cursor:pointer;border-radius:8px;padding:6px 8px;font-size:13px">✏️</button>
@@ -1157,6 +1158,11 @@ function renderGoals() {
           <div><div class="field-label">MONTHLY PAYMENT (₱)</div><input id="${pfx}loan-payment" type="number" step="0.01" min="0" ${l?`value="${lt.monthlyPayment.toFixed(2)}"`:'placeholder="auto"'} class="field-input" oninput="this.dataset.touched=1"></div>
         </div>
         <div id="${pfx}loan-summary" class="text-xs font-semibold mb-3" style="color:var(--accent-text)">${l?`Total payable ${fmt(lt.totalPayable)} · Total interest ${fmt(lt.totalInterest)} (${lt.interestPct.toFixed(1)}% of principal)`:''}</div>
+        ${state.creditCards.length?`<div class="mb-3">
+          <div class="field-label">CREDIT-TO-CASH FROM CARD (optional)</div>
+          <select id="${pfx}loan-card" class="field-input"><option value="">— Not a card loan —</option>${state.creditCards.map(c=>`<option value="${c.id}" ${l&&l.cardId===c.id?'selected':''}>${c.name}</option>`).join('')}</select>
+          <div class="text-xs mt-1" style="color:var(--text-3)">If this loan draws cash from a card's credit limit, that card's available credit drops by the remaining balance.</div>
+        </div>`:''}
         ${isEdit?'':`<div class="mb-3">
           <div class="field-label">DEPOSIT PROCEEDS TO (optional)</div>
           <select id="loan-deposit-acct" class="field-input"><option value="">— Don't record cash-in —</option>${(state.accounts||[]).map(a=>`<option value="${a.id}">${a.icon||''} ${a.name}</option>`).join('')}</select>
@@ -1364,7 +1370,9 @@ function renderAccounts() {
   }
 
   function ccCard(c) {
-    const avail=c.limit-c.outstanding, pct=c.limit>0?Math.min((c.outstanding/c.limit)*100,100):0;
+    // Credit-to-cash loans linked to this card block part of the limit until repaid.
+    const blockedCredit = (state.loans||[]).filter(l=>l.cardId===c.id).reduce((s,l)=>s+loanTotals(l).remainingPrincipal,0);
+    const avail=c.limit-c.outstanding-blockedCredit, pct=c.limit>0?Math.min(((c.outstanding+blockedCredit)/c.limit)*100,100):0;
     const isPaid = c.outstanding<=0;
     const dates = ccCycleDates(c.id) || {};
     const newCharges = ccCycleSpend(c.id);
@@ -1541,7 +1549,8 @@ function renderAccounts() {
           </div>
           <div class="rounded-lg p-3" style="background:var(--surface)">
             <div class="text-xs mb-1" style="color:var(--text-3)">Available Credit</div>
-            <div class="text-base font-bold text-pos">${fmt(avail)}</div>
+            <div class="text-base font-bold ${avail<0?'text-neg':'text-pos'}">${fmt(avail)}</div>
+            ${blockedCredit>0?`<div class="text-xs mt-0.5" style="color:var(--text-3)">−${fmt(blockedCredit)} credit-to-cash</div>`:''}
           </div>
           <div class="rounded-lg p-3" style="background:var(--surface)">
             <div class="text-xs mb-1" style="color:var(--text-3)">Credit Limit</div>
