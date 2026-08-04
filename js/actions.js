@@ -536,7 +536,19 @@ window.loanOpenEdit   = id => { goalUI.editLoanId=id; goalUI.showAddLoan=false; 
 window.loanCancelEdit = () => { goalUI.editLoanId=null; render(); };
 window.loanAskDelete  = id => { goalUI.deleteLoanId=id; goalUI.editLoanId=null; goalUI.paymentLoanId=null; render(); };
 window.loanCancelDelete=() => { goalUI.deleteLoanId=null; render(); };
-window.loanConfirmDelete=() => { state.loans=state.loans.filter(l=>l.id!==goalUI.deleteLoanId); save(); goalUI.deleteLoanId=null; render(); };
+window.loanConfirmDelete=() => {
+  const l = state.loans.find(x=>x.id===goalUI.deleteLoanId);
+  // Reverse the disbursement: pull the borrowed cash back out of the account it
+  // landed in and remove that transfer, so deleting the loan leaves net worth
+  // where it started (the borrowed money never really existed either).
+  if (l && l.disbursement) {
+    const dest = state.accounts.find(a=>a.id===l.disbursement.accountId);
+    if (dest) dest.balance -= l.disbursement.amount;
+    state.transactions = state.transactions.filter(t=>t.id!==l.disbursement.txId);
+  }
+  state.loans=state.loans.filter(x=>x.id!==goalUI.deleteLoanId);
+  save(); goalUI.deleteLoanId=null; render();
+};
 window.loanToggleHistory=id => { goalUI.expandedLoanId=goalUI.expandedLoanId===id?null:id; goalUI.paymentLoanId=null; render(); };
 window.loanOpenPayment= id => { goalUI.paymentLoanId=id; goalUI.expandedLoanId=null; render(); setTimeout(()=>document.getElementById('pay-amt-'+id)?.focus(),60); };
 window.loanClosePayment=() => { goalUI.paymentLoanId=null; render(); };

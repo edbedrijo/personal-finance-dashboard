@@ -22,7 +22,8 @@ const fmt2 = n => '₱' + n.toLocaleString('en-PH', {minimumFractionDigits:2, ma
 const sfx  = d => d>3&&d<21?'th':{1:'st',2:'nd',3:'rd'}[d%10]||'th';
 const totalAssets    = () => state.accounts.reduce((s,a)=>s+a.balance,0);
 const spendableAssets= () => state.accounts.reduce((s,a)=>s+(a.balance-(a.maintainingBalance||0)),0);
-const totalLiab      = () => state.creditCards.reduce((s,c)=>s+c.outstanding,0);
+const totalLiab      = () => state.creditCards.reduce((s,c)=>s+c.outstanding,0)
+                           + state.loans.reduce((s,l)=>s+loanTotals(l).remainingPrincipal,0);
 const netWorth       = () => totalAssets()-totalLiab();
 // Find any account OR credit card by id — used wherever a transaction's accountId may be a CC
 const findAccount = id => state.accounts.find(a=>a.id===id) || state.creditCards.find(c=>c.id===id) || null;
@@ -103,12 +104,17 @@ function loanTotals(l) {
   const totalInterest   = Math.max(totalPayable - l.principal, 0);
   const paid            = (l.payments||[]).reduce((s,p)=>s+p.amount,0);
   const remaining       = Math.max(totalPayable - paid, 0);
+  // Remaining PRINCIPAL (what you'd owe to clear the loan today, excluding
+  // future interest) — split each payment proportionally into principal/interest.
+  // At disbursement (paid=0) this equals the full principal, so net worth stays
+  // neutral when the borrowed cash lands in an account.
+  const remainingPrincipal = totalPayable>0 ? l.principal * (remaining/totalPayable) : 0;
   // Epsilon guards float noise (e.g. 35.0000003 must not round up to 36)
   const paymentsLeft    = monthlyPayment>0 ? Math.min(l.termMonths||0, Math.ceil(remaining/monthlyPayment - 1e-7)) : 0;
   const pctPaid         = totalPayable>0 ? Math.min((paid/totalPayable)*100,100) : 0;
   return { monthlyInterest, defaultPayment, monthlyPayment, totalPayable, totalInterest,
            interestPct: l.principal>0 ? (totalInterest/l.principal)*100 : 0,
-           paid, remaining, paymentsLeft, pctPaid };
+           paid, remaining, remainingPrincipal, paymentsLeft, pctPaid };
 }
 
 // ── Dashboard data: auto-calculate from transactions if available ──
