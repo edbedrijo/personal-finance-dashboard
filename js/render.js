@@ -429,16 +429,26 @@ function renderDashboard() {
   const forecastExpense=forecastItems.expense.reduce((s,r)=>s+r.amount,0);
   // All CCs with outstanding balance — always shown so user never misses an obligation
   const ccDueForecast = (state.creditCards||[]).filter(c=>c.outstanding>0);
-  // What's payable on the due date is the unpaid statement balance, not the full
-  // outstanding (which includes new charges billed on the NEXT statement)
-  const ccDueAmount = c => c.lastStatement>0
-    ? Math.max(0, c.lastStatement - ccStatementPayments(c.id))
-    : c.outstanding;
-  // Only count toward "available" if due within the forecast window
-  const ccForecastExp = ccDueForecast.filter(c=>{
+  // Split each card's outstanding into two buckets that always sum to it:
+  //   1. Statement remaining — what's payable on THIS statement's due date.
+  //   2. New charges — billed on the NEXT statement, so due a cycle later.
+  // Both buckets follow the same in-window rule, so the full current balance is
+  // visible without overstating what's actually due inside the window.
+  const ccStmtRemaining = c => c.lastStatement>0 ? Math.max(0, c.lastStatement - ccStatementPayments(c.id)) : 0;
+  const ccNextDue = c => { const d0 = ccCycleDates(c.id); if(!d0||!d0.due) return null; const d = new Date(d0.due+'T00:00:00'); d.setMonth(d.getMonth()+1); return toLocalISO(d); };
+  const ccForecastLines = ccDueForecast.flatMap(c=>{
     const dates = ccCycleDates(c.id);
-    return dates && dates.due >= todayISO && dates.due <= forecastEnd;
-  }).reduce((s,c)=>s+ccDueAmount(c),0);
+    const stmt  = ccStmtRemaining(c);
+    const fresh = Math.max(0, (c.outstanding||0) - stmt); // the rest → next statement
+    const lines = [];
+    if(stmt>0)  lines.push({name:c.name, amount:stmt,  due:dates?dates.due:null, kind:'stmt'});
+    if(fresh>0) lines.push({name:c.name, amount:fresh, due:ccNextDue(c),          kind:'new'});
+    return lines;
+  });
+  // Only count toward "available" if due within the forecast window
+  const ccForecastExp = ccForecastLines
+    .filter(l=>l.due && l.due >= todayISO && l.due <= forecastEnd)
+    .reduce((s,l)=>s+l.amount,0);
   // Loan monthly payments — same treatment as CC dues. Loans store no due-day, so
   // derive it from the start date's day-of-month; skip fully-paid loans.
   const loanNextDue = l => {
@@ -490,7 +500,7 @@ function renderDashboard() {
   const available=spendable+forecastIncome-forecastExpense-ccForecastExp-loanForecastExp-projectedVariable-plannedSavings-cashFloor;
   // Stricter bottom line: subtract EVERY unpaid CC due and next loan payment, even
   // outside the window — that money is already spoken for, whatever the window says.
-  const allCCDue=ccDueForecast.reduce((s,c)=>s+ccDueAmount(c),0);
+  const allCCDue=ccForecastLines.reduce((s,l)=>s+l.amount,0);
   const afterAllCC=spendable+forecastIncome-forecastExpense-allCCDue-allLoanDue-projectedVariable-plannedSavings-cashFloor;
   const healthRatio=spendable>0?afterAllCC/spendable:(afterAllCC>=0?1:-1);
   const weather=afterAllCC<0
@@ -502,7 +512,7 @@ function renderDashboard() {
   const next7=toLocalISO(new Date(now.getTime()+7*86400000));
   const upcomingBills=[
     ...(state.recurring||[]).filter(r=>r.active&&r.type==='expense'&&r.nextDue<=next7).map(r=>({icon:r.icon||'🔁',name:r.name,date:r.nextDue,amount:r.amount})),
-    ...ccDueForecast.map(c=>({icon:'💳',name:c.name,date:ccCycleDates(c.id)?.due,amount:ccDueAmount(c)})).filter(b=>b.date&&b.date<=next7),
+    ...ccForecastLines.map(l=>({icon:'💳',name:l.kind==='new'?l.name+' (new charges)':l.name,date:l.due,amount:l.amount})).filter(b=>b.date&&b.date<=next7),
     ...loanDueForecast.map(x=>({icon:x.l.icon||'🏦',name:x.l.name,date:x.due,amount:x.amount})).filter(b=>b.date&&b.date<=next7),
   ].sort((a,b)=>a.date.localeCompare(b.date));
   // Compute vs Last Month dynamically
@@ -614,7 +624,7 @@ function renderDashboard() {
       ${forecastItems.income.length===0?`<div class="text-xs text-dimmer py-1.5">None in this window</div>`:forecastItems.income.map(r=>`<div class="flex justify-between items-center py-1.5"><div class="text-sm flex items-center gap-2"><span>${r.icon}</span>${r.name}</div><div class="text-sm ${r.amount===0?'text-dimmer':'text-pos'}">${r.amount===0?'—':'+ '+fmt(r.amount)}</div></div>`).join('')}
       <div class="text-xs text-dimmer font-semibold tracking-wider mt-4 mb-2">SCHEDULED EXPENSES</div>
       ${forecastItems.expense.length===0&&ccForecastExp===0&&allLoanDue===0?`<div class="text-xs text-dimmer py-1.5">None in this window</div>`:forecastItems.expense.map(r=>`<div class="flex justify-between items-center py-1.5"><div class="text-sm flex items-center gap-2"><span>${r.icon}</span>${r.name}</div><div class="text-sm text-neg">− ${fmt(r.amount)}</div></div>`).join('')}
-      ${ccDueForecast.map(c=>{ const dates=ccCycleDates(c.id); const inWindow=dates&&dates.due<=forecastEnd; return `<div class="flex justify-between items-center py-1.5"><div class="text-sm flex items-center gap-2"><span>💳</span>${c.name}<span class="text-xs ml-1" style="color:${inWindow?'var(--amber)':'var(--text-3)'}">due ${dates?fmtDateShort(dates.due):'—'}${inWindow?'':' · outside window'}</span></div><div class="text-sm" style="color:${inWindow?'var(--red)':'var(--text-3)'}">− ${fmt(ccDueAmount(c))}</div></div>`; }).join('')}
+      ${ccForecastLines.map(l=>{ const inWindow=l.due&&l.due<=forecastEnd; const tag=l.kind==='new'?` <span class="text-xs" style="color:var(--text-3)">new charges</span>`:''; return `<div class="flex justify-between items-center py-1.5"><div class="text-sm flex items-center gap-2"><span>💳</span>${l.name}${tag}<span class="text-xs ml-1" style="color:${inWindow?'var(--amber)':'var(--text-3)'}">due ${l.due?fmtDateShort(l.due):'—'}${inWindow?'':' · outside window'}</span></div><div class="text-sm" style="color:${inWindow?'var(--red)':'var(--text-3)'}">− ${fmt(l.amount)}</div></div>`; }).join('')}
       ${loanDueForecast.map(x=>{ const inWindow=x.due<=forecastEnd; return `<div class="flex justify-between items-center py-1.5"><div class="text-sm flex items-center gap-2"><span>${x.l.icon||'🏦'}</span>${x.l.name}<span class="text-xs ml-1" style="color:${inWindow?'var(--amber)':'var(--text-3)'}">due ${fmtDateShort(x.due)}${inWindow?'':' · outside window'}</span></div><div class="text-sm" style="color:${inWindow?'var(--red)':'var(--text-3)'}">− ${fmt(x.amount)}</div></div>`; }).join('')}
       ${projectedVariable>0?`<div class="text-xs text-dimmer font-semibold tracking-wider mt-4 mb-2">EVERYDAY SPENDING (projected)</div>
       <div class="flex justify-between items-center py-1.5"><div class="text-sm flex items-center gap-2"><span>🔥</span>Est. daily spend<span class="text-xs ml-1" style="color:var(--text-3)">${fmt(variableDaily)}/day × ${state.forecastDays||7}d</span></div><div class="text-sm text-neg">− ${fmt(projectedVariable)}</div></div>`:''}
